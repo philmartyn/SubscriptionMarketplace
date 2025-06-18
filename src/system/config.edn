@@ -1,0 +1,2 @@
+{:db {:dbtype "postgresql" :dbname "marketplace"}
+ :http/server {:handler app.myapp.handler/app :port 3000}}
