@@ -1,8 +1,8 @@
 (ns views.htmx
   (:require
-   [ring.util.http-response :as http-response]
+   [hiccup.page :as p]
    [hiccup2.core :as h]
-   [hiccup.page :as p]))
+   [ring.util.http-response :as http-response]))
 
 (defmacro page [opts & content]
   `(-> (p/html5 ~opts ~@content)

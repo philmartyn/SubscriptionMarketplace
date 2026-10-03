@@ -1,15 +1,15 @@
 (ns modules.routes
   (:require
-    [modules.health :as health]
-    [shared.middleware.exception :as exception]
-    [shared.middleware.formats :as formats]
-    [integrant.core :as ig]
-    [reitit.coercion.malli :as malli]
-    [reitit.ring.coercion :as coercion]
-    [reitit.ring.middleware.muuntaja :as muuntaja]
-    [reitit.ring.middleware.parameters :as parameters]
-    [modules.auth.routes :as auth]
-    [reitit.swagger :as swagger]))
+   [integrant.core :as ig]
+   [modules.auth.routes :as auth]
+   [modules.health :as health]
+   [reitit.coercion.malli :as malli]
+   [reitit.ring.coercion :as coercion]
+   [reitit.ring.middleware.muuntaja :as muuntaja]
+   [reitit.ring.middleware.parameters :as parameters]
+   [reitit.swagger :as swagger]
+   [shared.middleware.exception :as exception]
+   [shared.middleware.formats :as formats]))
 
 (def route-data
   {:coercion   malli/coercion
@@ -36,12 +36,10 @@
 (defn api-routes [_opts]
   [(auth/routes)
 
-
    ["/swagger.json"
     {:get {:no-doc  true
            :swagger {:info {:title "submarket.dashboard API"}}
            :handler (swagger/create-swagger-handler)}}]
-
 
    ["/health"
     ;; note that use of the var is necessary

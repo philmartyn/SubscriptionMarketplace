@@ -1,6 +1,5 @@
 (ns views.dashboard.auth
-  (:require [views.htmx :refer [page pagelet] :as htmx])
-)
+  (:require [views.htmx :refer [page pagelet] :as htmx]))
 
 (defn sign-up [request])
 
@@ -17,11 +16,4 @@
          [:form {:style {:display :flex}}
           [:input.input {:id "email" :name "email" :type "Email" :placeholder "Enter Email here"}]
           [:input.input {:id "password" :name "password" :type "Password" :placeholder "Enter Password here"}]
-          [:button.btn {:hx-post "/api/auth/signin" :hx-swap "outerHTML"} "Submit"]
-
-          ]
-
-
-
-
-         ]))
+          [:button.btn {:hx-post "/api/auth/signin" :hx-swap "outerHTML"} "Submit"]]]))
