@@ -35,4 +35,4 @@ jobs:
 
       # 4. Run the test command
       - name: Run test suite
-        run: clj -X:test
+        run: clojure -X:test
