@@ -1,5 +1,11 @@
-(ns components.db.core)
+(ns components.db.core
+  (:require [integrant.core :as ig]
+            [next.jdbc :as jdbc]
+            [next.jdbc.result-set :as rs]))
 
-(defn connect []
-  ;; setup DB connection here
-  )
+
+(defmethod ig/init-key :database.sql/connection [_ db-spec]
+  (def db-spec db-spec)
+  (jdbc/with-options
+   (jdbc/get-datasource db-spec)
+   {:builder-fn rs/as-unqualified-lower-maps}))
