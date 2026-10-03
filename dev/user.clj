@@ -9,7 +9,6 @@
    [aero.core :as aero]
    [app.handler]
    [app.core]
-   [shared.config_old :as config]
    [next.jdbc :as next.jdbc]
    [integrant.repl :as ig-repl :refer [clear go halt prep init reset reset-all]]
    [clj-http.client :as client]
