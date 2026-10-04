@@ -44,11 +44,24 @@
                            :env    #ig/ref :system/env}
  ;
  ;;:email-sender {}
- :database.sql/connection #profile {:default {:port     5432
-                                              :user     "admin"
-                                              :dbtype   "postgresql"
-                                              :dbname   "sub_market_test"
-                                              :password "1234"}}
+ ;; Aero's #profile selects one branch rather than merging, so #profile around
+ ;; the whole map would let a profile entry replace the connection details.
+ ;; Profile the single flag instead.
+ ;;
+ ;; Tests and local development apply migrations at boot, so a fresh checkout
+ ;; needs no separate migrate step. Production leaves this off: a schema change
+ ;; there should be a deliberate deploy step, not a side effect of whichever
+ ;; revision an instance happened to start on.
+ :database.sql/connection {:port     5432
+                           :user     "admin"
+                           :dbtype   "postgresql"
+                           :dbname   "sub_market_test"
+                           :password "1234"
+                           ;; Aero resolves #profile by selecting a single branch:
+                           ;; (get branches profile (get branches :default)). With no
+                           ;; :profile supplied it resolves :default, so prod and any
+                           ;; unprofiled run both land on false.
+                           :migrate? #profile {:dev true :test true :default false}}
  }
 
 

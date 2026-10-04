@@ -1,0 +1,147 @@
+;; SubMarket initial schema.
+;;
+;; Identity lives in `accounts`, not in `users`. A subscriber and a vendor are
+;; separate entities with separate signup flows, but they authenticate against
+;; the same credential store, which is what allows a single login form.
+;;
+;; This file replaces the earlier scratch schema wholesale. Nothing had been
+;; deployed, so there was no data to preserve.
+[
+
+ {:id "001-create-accounts-table"
+  :up ["CREATE TABLE accounts (
+  id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  email             TEXT NOT NULL,
+  -- lower(trim(email)), written by the service layer so that logging in is
+  -- case insensitive. Deliberately NOT given a UNIQUE constraint here: Postgres
+  -- would auto-name that index accounts_email_normalized_key and collide with
+  -- the explicit case-insensitive index in migration 002. This column is the
+  -- single source of truth for the email address.
+  email_normalized  TEXT NOT NULL,
+  -- PHC-format Argon2id string. Never a raw or reversibly-encoded password.
+  password_hash     TEXT NOT NULL,
+  account_type      TEXT NOT NULL CHECK (account_type IN ('user', 'vendor')),
+  -- NULL until the verification link is consumed. An account may sign in and
+  -- browse while unverified, but is reminded until it verifies.
+  email_verified_at TIMESTAMPTZ,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);"]
+  :down ["DROP TABLE accounts;"]}
+
+ {:id "002-create-users-table"
+  :up ["CREATE TABLE users (
+  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  account_id BIGINT NOT NULL UNIQUE REFERENCES accounts(id) ON DELETE CASCADE,
+  name       TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);"]
+  :down ["DROP TABLE users;"]}
+
+ {:id "003-create-vendors-table"
+  :up ["CREATE TABLE vendors (
+  id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  account_id  BIGINT NOT NULL UNIQUE REFERENCES accounts(id) ON DELETE CASCADE,
+  name        TEXT NOT NULL,
+  description TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);"]
+  :down ["DROP TABLE vendors;"]}
+
+ {:id "004-create-sessions-table"
+  :up ["CREATE TABLE sessions (
+  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  account_id BIGINT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  -- SHA-256 of the opaque session token. The token itself is never persisted,
+  -- so a database leak does not yield usable sessions.
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  revoked_at TIMESTAMPTZ,
+  ip         TEXT,
+  user_agent TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Supports 'all my active sessions', the common lookup after sign-in.
+CREATE INDEX sessions_account_active_idx ON sessions (account_id) WHERE revoked_at IS NULL;
+
+-- Supports the sweep that deletes expired rows.
+CREATE INDEX sessions_expires_at_idx ON sessions (expires_at);"]
+  :down ["DROP TABLE sessions;"]}
+
+ {:id "005-create-verification-tokens-table"
+  :up ["CREATE TABLE verification_tokens (
+  id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  account_id  BIGINT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  -- SHA-256 of the token mailed to the user. Single use: consumed_at is set
+  -- on first successful verification and a replay is rejected.
+  token_hash  TEXT NOT NULL UNIQUE,
+  expires_at  TIMESTAMPTZ NOT NULL,
+  consumed_at TIMESTAMPTZ,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Resend supersedes any outstanding token for an account rather than
+-- accumulating them.
+CREATE INDEX verification_tokens_account_idx ON verification_tokens (account_id);"]
+  :down ["DROP TABLE verification_tokens;"]}
+
+ {:id "006-create-products-table"
+  :up ["CREATE TABLE products (
+  id               BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  vendor_id        BIGINT NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
+  name             TEXT NOT NULL,
+  description      TEXT,
+  price_cents      INTEGER NOT NULL CHECK (price_cents >= 0),
+  currency         TEXT NOT NULL DEFAULT 'EUR',
+  -- 'weekly' is present because the landing page sells a Weekly Box at EUR 89
+  -- per week; the previous schema allowed only monthly and yearly, which meant
+  -- a plan shown on the marketing page could not be stored.
+  billing_interval TEXT NOT NULL CHECK (billing_interval IN ('weekly', 'monthly', 'yearly')),
+  is_active        BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);"]
+  :down ["DROP TABLE products;"]}
+
+ {:id "007-create-subscriptions-table"
+  :up ["CREATE TABLE subscriptions (
+  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  -- Subscriptions belong to subscribers, so this references the users profile
+  -- rather than accounts directly.
+  user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  start_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  end_date   DATE,
+  status     TEXT NOT NULL CHECK (status IN ('active', 'cancelled', 'expired')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);"]
+  :down ["DROP TABLE subscriptions;"]}
+
+ {:id "008-create-payments-table"
+  :up ["CREATE TABLE payments (
+  id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  subscription_id   BIGINT NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
+  amount_cents      INTEGER NOT NULL CHECK (amount_cents >= 0),
+  currency          TEXT NOT NULL DEFAULT 'EUR',
+  payment_date      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  status            TEXT NOT NULL CHECK (status IN ('succeeded', 'failed', 'pending')),
+  stripe_payment_id TEXT,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);"]
+  :down ["DROP TABLE payments;"]}
+
+ {:id "009-create-audit-log-table"
+  :up ["CREATE TABLE audit_log (
+  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  -- Deliberately no ON DELETE CASCADE. Audit rows outlive the account; the
+  -- previous schema left this as an implicit NO ACTION by omission.
+  user_id    BIGINT REFERENCES users(id),
+  action     TEXT NOT NULL,
+  metadata   JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);"]
+  :down ["DROP TABLE audit_log;"]}
+
+ ]

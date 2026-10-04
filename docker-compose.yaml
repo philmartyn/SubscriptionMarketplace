@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:alpine
+    image: postgres:17-alpine
     environment:
       POSTGRES_DB: sub_market_test
       POSTGRES_USER: admin
@@ -15,30 +15,8 @@ services:
       - app_network
     restart: unless-stopped
     healthcheck:
-      test: ['CMD', 'pg_isready', '-U', 'supertokens_user', '-d', 'supertokens']
+      test: ['CMD-SHELL', 'pg_isready -U admin -d sub_market_test']
       interval: 5s
-      timeout: 5s
-      retries: 5
-
-  supertokens:
-    image: registry.supertokens.io/supertokens/supertokens-postgresql:latest
-    depends_on:
-      postgres:
-        condition: service_healthy
-    ports:
-      - 3567:3567
-    environment:
-      POSTGRESQL_CONNECTION_URI: "postgresql://admin:1234@postgres:5432/supertokens"
-      SUPERTOKENS_CONNECTION_URI: http://localhost:3567
-      POSTGRESQL_TABLE_NAMES_PREFIX: supertokens_
-      POSTGRESQL_DATABASE_NAME: supertokens  # 👈 use a separate db
-    networks:
-      - app_network
-    restart: unless-stopped
-    healthcheck:
-      test: >
-        bash -c 'exec 3<>/dev/tcp/127.0.0.1/3567 && echo -e "GET /hello HTTP/1.1\r\nhost: 127.0.0.1:3567\r\nConnection: close\r\n\r\n" >&3 && cat <&3 | grep "Hello"'
-      interval: 10s
       timeout: 5s
       retries: 5
 

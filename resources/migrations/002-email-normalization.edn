@@ -1,0 +1,17 @@
+;; Database-side guarantee that account emails are unique regardless of case.
+;;
+;; The service layer already writes a lowercased email_normalized, and 001 puts
+;; a UNIQUE on that column. This adds the matching guard on the raw value so
+;; that any future write which bypasses the normaliser cannot create a second
+;; account differing only by case.
+;;
+;; This matters because Postgres TEXT UNIQUE is case sensitive: without it,
+;; Test@example.com and test@example.com are two accounts, and password reset
+;; then mails whichever row happens to match.
+[
+
+ {:id "010-add-case-insensitive-email-uniqueness"
+  :up ["CREATE UNIQUE INDEX accounts_email_normalized_key ON accounts (lower(email_normalized));"]
+  :down ["DROP INDEX accounts_email_normalized_key;"]}
+
+ ]

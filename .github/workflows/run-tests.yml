@@ -10,10 +10,32 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    # Mirrors docker-compose.yaml exactly: same image major, database name,
+    # role and port. Tests read these credentials from system.edn, so any
+    # divergence here shows up as a connection failure rather than as a
+    # silently skipped database test.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          # Quoted: unquoted 1234 parses as an integer, not a password string.
+          POSTGRES_DB: "sub_market_test"
+          POSTGRES_USER: "admin"
+          POSTGRES_PASSWORD: "1234"
+        ports:
+          - 5432:5432
+        # Without this the suite can start before Postgres accepts
+        # connections and fail intermittently.
+        options: >-
+          --health-cmd "pg_isready -U admin -d sub_market_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       # 1. Check out the repository code
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # 2. Install Java and the Clojure CLI
       - name: Setup Clojure
@@ -21,9 +43,31 @@ jobs:
         with:
           cli: 'latest' # Installs the latest Clojure CLI
 
-      # 3. Cache dependencies to speed up future workflow runs
+      # 3. Node, for the Tailwind build below
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      # 4. Build the stylesheet.
+      #
+      # resources/public/output.css is generated and gitignored, so a fresh
+      # checkout does not have it. core-test asserts that it is served, which
+      # is a 404 without this step, and views.stylesheet-test silently
+      # registers no tests at all.
+      #
+      # npm ci rather than npm install, so the build uses exactly the
+      # committed package-lock.json.
+      - name: Build the Tailwind bundle
+        run: |
+          npm ci
+          npm run tailwind
+
+      # 5. Cache dependencies to speed up future workflow runs
       - name: Cache Clojure dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.m2/repository
@@ -33,6 +77,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-clojure-
 
-      # 4. Run the test command
+      # 6. Run the test command
+      #
+      # The schema is applied by the :migrate? flag in system.edn, which is
+      # enabled for the :test profile, so no separate migrate step is needed.
       - name: Run test suite
         run: clojure -X:test

@@ -3,13 +3,17 @@
 
            aero/aero                         {:mvn/version "1.1.6"}
            buddy/buddy-auth                  {:mvn/version "3.0.323"}
+           buddy/buddy-core                  {:mvn/version "1.12.0-430"}
            buddy/buddy-sign                  {:mvn/version "3.6.1-359"}
            com.github.seancorfield/next.jdbc {:mvn/version "1.3.981"}
            com.github.seancorfield/honeysql  {:mvn/version "2.6.1270"}
            clj-http/clj-http                 {:mvn/version "3.13.0"}
+           dev.weavejester/ragtime           {:mvn/version "0.11.0"}
            integrant/integrant               {:mvn/version "0.13.1"}
            metosin/reitit                    {:mvn/version "0.11.0"}
            metosin/jsonista                  {:mvn/version "0.3.13"}
+           ;; Argon2id password hashing
+           org.bouncycastle/bcprov-jdk18on    {:mvn/version "1.78.1"}
            org.postgresql/postgresql         {:mvn/version "42.7.7"}
            ;; Ring
            metosin/ring-http-response        {:mvn/version "0.9.3"}
@@ -53,6 +57,8 @@
                                  lambdaisland/kaocha                  {:mvn/version "1.91.1392"}}
                    :exec-fn     kaocha.runner/exec-fn
                    :extra-paths ["test/clj" "dev"]}
+
+           :db    {:main-opts ["-m" "components.db.cli"]}
 
            :dev   {:extra-paths ["dev"]
                    :extra-deps  {com.lambdaisland/classpath      {:mvn/version "0.5.48"}
