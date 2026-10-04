@@ -1,0 +1,22 @@
+@import "tailwindcss" source(none);
+@source "../src/**/*.clj";
+
+@plugin "daisyui" {
+  themes: light --default, dark --prefersdark;
+}
+
+/* Theme switcher icons.
+   Purely CSS so they stay correct without JavaScript, and so they survive
+   hx-boost body swaps (data-theme lives on <html>, which is never swapped). */
+[data-theme="dark"] #icon-sun {
+  display: none;
+}
+
+[data-theme="light"] #icon-moon {
+  display: none;
+}
+
+/* Anchor targets sit below the sticky navbar without a fixed offset. */
+[id] {
+  scroll-margin-top: 5rem;
+}

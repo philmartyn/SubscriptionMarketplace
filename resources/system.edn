@@ -2,7 +2,8 @@
                                     :test :test
                                     :prod :prod}
 
- :server/http             {:port    #profile {:dev 3000},
+ :server/http             {:port    #profile {:dev 3000
+                                              :test 3006},
                            :host    #or [#env HTTP_HOST "localhost"]
                            :handler #ig/ref :handler/ring}
 
@@ -43,11 +44,11 @@
                            :env    #ig/ref :system/env}
  ;
  ;;:email-sender {}
- :database.sql/connection #profile {:dev {:port     5432
-                                          :user     "admin"
-                                          :dbtype   "postgresql"
-                                          :dbname   "sub_market_test"
-                                          :password "1234"}}
+ :database.sql/connection #profile {:default {:port     5432
+                                              :user     "admin"
+                                              :dbtype   "postgresql"
+                                              :dbname   "sub_market_test"
+                                              :password "1234"}}
  }
 
 

@@ -1,0 +1,17 @@
+{
+  "name": "submarket",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Static asset build for the SubMarket landing page (Tailwind CSS + daisyUI)",
+  "scripts": {
+    "tailwind": "tailwindcss -i tailwind/input.css -o resources/public/output.css",
+    "tailwind:watch": "tailwindcss -i tailwind/input.css -o resources/public/output.css --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.11",
+    "tailwindcss": "^4.1.11"
+  },
+  "dependencies": {
+    "daisyui": "^5.0.43"
+  }
+}

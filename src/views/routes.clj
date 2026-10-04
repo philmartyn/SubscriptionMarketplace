@@ -1,22 +1,22 @@
 (ns views.routes
   (:require
-   [clojure.tools.logging :as log]
    [integrant.core :as ig]
    [reitit.ring.middleware.muuntaja :as muuntaja]
     ;[views.htmx :refer [page pagelet] :as htmx]
    [reitit.ring.middleware.parameters :as parameters]
    [shared.middleware.exception :as exception]
    [shared.middleware.formats :as formats]
-   [views.dashboard.auth :as auth]
-   [views.dashboard.home :as home]))
+   [views.auth :as auth]
+   [views.dashboard.home :as home]
+   [views.landing.index :as landing]))
 
 ;; Routes
 (defn ui-routes [_opts]
-  [["/" {:get (fn [r] (log/info "!!!!!!!") [:div "Test"] (home/home r))}]
-   ["/auth/login" {:get auth/login}
-   ;"/auth/signin" {:get (fn [request] (prn 'sign 1))
-   ;:post (fn [request] (prn 'sign 2))}
-    ]])
+  [["/" {:get landing/landing}]
+   ["/dashboard" {:get home/home}]
+   ["/auth/signin" {:get auth/signin}]
+   ["/auth/signup" {:get auth/signup}]])
+
 (def route-data
   {:muuntaja   formats/instance
    :middleware

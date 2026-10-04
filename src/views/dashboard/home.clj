@@ -3,8 +3,7 @@
             #_[submarket.dashboard.web.middleware.supertokens-sessions :as st]
             #_[views.dashboard.auth :as auth]))
 
-(defn home [request]
-  (def request request)
+(defn home [_request]
   (page
    {:lang "en"}
    [:head
@@ -13,5 +12,5 @@
     [:link {:href "/output.css" :rel "stylesheet"}]
     [:script {:src "https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" :defer true}]]
    [:body
-    [:h1 "Welcome to Htmx + Kit module"]
+    [:h1 "Welcome to Htmx + Kit "]
     [:button.btn "Default"]]))

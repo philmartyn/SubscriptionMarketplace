@@ -1,2 +1,6 @@
 /.cpcache/
 /.idea/
+/node_modules/
+/resources/public/output.css
+/.clj-kondo/
+/.nrepl-port
