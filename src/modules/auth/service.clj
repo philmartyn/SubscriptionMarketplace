@@ -61,9 +61,20 @@
     (when (str/blank? (str name))
       "Tell us the name your customers will see.")))
 
+(defn- account-type-error
+  "Nil for :user and :vendor, which are the only two kinds of account.
+
+  Checked here rather than left to the database's CHECK constraint, because
+  register! is documented to answer with a result map rather than throw, and
+  a PSQLException for a caller's typo is neither."
+  [account-type]
+  (when-not (contains? account-types account-type)
+    "Unknown account type."))
+
 (defn- validation-errors
   [account-type {:keys [email password name]}]
   (cond-> {}
+    (account-type-error account-type) (assoc :account-type (account-type-error account-type))
     (email-error email)     (assoc :email (email-error email))
     (password-error password) (assoc :password (password-error password))
     (name-error account-type name) (assoc :name (name-error account-type name))))
@@ -98,8 +109,9 @@
 (defn register!
   "Create an account with its profile, then email a verification link.
 
-  Returns {:ok? true :account-id n :verification-url u} or
-  {:ok? false :errors {...}} with errors keyed by form field."
+  Returns {:ok? true :account-id n :account-type k :verification-url u} or
+  {:ok? false :errors {...}} with errors keyed by form field. Never throws for
+  input a caller could have got wrong."
   [db mailer config {:keys [account-type email password name description] :as input}]
   (let [errors (validation-errors account-type input)]
     (if (seq errors)
@@ -123,7 +135,10 @@
                             "The link is valid for " verification-ttl-hours " hours.")})
             {:ok? true
              :account-id id
-             :account-type (:account_type account)
+             ;; The keyword that came in, not (:account_type account): accounts
+             ;; stores that as text, and handing a caller a string back for a
+             ;; keyword input makes every consumer cast it again.
+             :account-type account-type
              :verification-url url}))))))
 
 (defn verification-email-body

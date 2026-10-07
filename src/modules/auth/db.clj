@@ -99,15 +99,22 @@
 
   Returns the created account row."
   [db {:keys [account-type] :as input}]
-  (jdbc/with-transaction [tx db]
-    (let [account (create-account! tx input)]
-      (when-not (:id account)
-        (throw (ex-info "Account insert did not return an id" {:account account})))
-      (case account-type
-        :user  (create-user-profile! tx (assoc input :account-id (:id account)))
-        :vendor (create-vendor-profile! tx (assoc input :account-id (:id account)))
-        (throw (ex-info "Unknown account type" {:account-type account-type})))
-      (assoc account :account_type (name account-type)))))
+  ;; Resolve the profile writer before anything is written. accounts carries its
+  ;; own CHECK on account_type, so letting the insert run first means an unknown
+  ;; type surfaces as a PSQLException naming a constraint rather than as this
+  ;; error naming the actual mistake - and it would leave nothing behind either
+  ;; way, because the transaction rolls back.
+  (let [write-profile (case account-type
+                        :user   create-user-profile!
+                        :vendor create-vendor-profile!
+                        (throw (ex-info "Unknown account type"
+                                        {:account-type account-type})))]
+    (jdbc/with-transaction [tx db]
+      (let [account (create-account! tx input)]
+        (when-not (:id account)
+          (throw (ex-info "Account insert did not return an id" {:account account})))
+        (write-profile tx (assoc input :account-id (:id account)))
+        (assoc account :account_type (name account-type))))))
 
 (defn find-account-by-email
   "Look up by normalized email. Case insensitive by construction: the
@@ -180,9 +187,14 @@
                              [:accounts.password_hash :password_hash]
                              [:accounts.account_type :account_type]
                              [:accounts.email_verified_at :email_verified_at]]
-                    :from   [:sessions
-                             [:inner-join :accounts
-                              :on [:= :sessions.account_id :accounts.id]]]
+                    ;; honey.sql takes a join as a top-level :join clause whose
+                    ;; value is a flat sequence of [table condition table
+                    ;; condition ...]. Writing it into :from instead reads as an
+                    ;; alias and trips "illegal syntax in select expression",
+                    ;; and an :on keyword misaligns the pairing into the same
+                    ;; error. This was never exercised by the probe scripts.
+                    :from   [:sessions]
+                    :join   [:accounts [:= :sessions.account_id :accounts.id]]
                     :where  [:and
                              [:= :sessions.token_hash token-hash]
                              [:= :sessions.revoked_at nil]
