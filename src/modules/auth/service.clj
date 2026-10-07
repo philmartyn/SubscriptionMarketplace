@@ -206,6 +206,21 @@
       {:ok? false :reason :invalid})
     {:ok? false :reason :invalid}))
 
+(defn verify-account!
+  "Mark an account verified without consuming a token.
+
+  The development stand-in for clicking the link in the verification email,
+  used while no real mailer is wired. It is a deliberate bypass, so the HTTP
+  handler only reaches it behind the :dev-verify? flag (see
+  modules.auth.handlers/verify-now). Marking is idempotent: an account that is
+  already verified keeps its original timestamp, so a double submit is
+  harmless."
+  [db account-id]
+  (when-let [account (db/find-account-by-id db account-id)]
+    (when-not (db/email-verified? account)
+      (db/mark-email-verified! db account-id)))
+  {:ok? true})
+
 (defn resend-verification
   "Issue a new link for an account that has not yet verified."
   [db mailer config account-id]

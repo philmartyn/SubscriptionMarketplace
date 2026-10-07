@@ -27,7 +27,7 @@
 
 (defn- request
   "A POST request shaped the way wrap-base hands one to a route handler."
-  [path params & [{:keys [htmx? session mailer]}]]
+  [path params & [{:keys [htmx? session mailer dev-verify?]}]]
   {:request-method :post
    :uri            path
    :params         params
@@ -35,7 +35,8 @@
    :headers        (when htmx? {"hx-request" "true"})
    :system         {:db     sup/*db*
                     :mailer (or mailer (mailer-for))
-                    :config {:base-url "http://localhost:3000"}}})
+                    :config {:base-url    "http://localhost:3000"
+                             :dev-verify? dev-verify?}}})
 
 (defn- signup-input
   [overrides]
@@ -215,6 +216,71 @@
                          {:session {:account-id (:account-id created)}}))]
       (is (= 302 (:status resp)))
       (is (str/includes? (get-in resp [:headers "Location"]) "/auth/signin")))))
+
+;;; simulate email click (dev only)
+
+(defn- register-unverified!
+  "A fresh, unverified subscriber account, as signup would leave it."
+  []
+  (service/register! sup/*db* (mailer-for)
+                     {:base-url "http://localhost:3000"}
+                     {:account-type :user
+                      :email "ada@example.com"
+                      :password "an-appropriate-password!"
+                      :name "Ada"}))
+
+(deftest verify-now-marks-the-account-verified-and-turns-to-the-dashboard
+  (let [created (register-unverified!)
+        acct-id (:account-id created)
+        resp    (handlers/verify-now
+                 (request "/auth/dev-verify" {}
+                          {:dev-verify? true
+                           :session {:account-id acct-id}}))]
+    (is (= 302 (:status resp)))
+    (is (str/includes? (get-in resp [:headers "Location"]) "/dashboard"))
+    (is (db/email-verified? (db/find-account-by-id sup/*db* acct-id)))))
+
+(deftest verify-now-from-htmx-redirects-via-header
+  (let [created (register-unverified!)
+        acct-id (:account-id created)
+        resp    (handlers/verify-now
+                 (request "/auth/dev-verify" {}
+                          {:dev-verify? true :htmx? true
+                           :session {:account-id acct-id}}))]
+    (is (= 200 (:status resp)))
+    (is (= "/dashboard" (get-in resp [:headers "HX-Redirect"])))
+    (is (db/email-verified? (db/find-account-by-id sup/*db* acct-id)))))
+
+(deftest verify-now-is-unavailable-outside-development
+  (let [created (register-unverified!)
+        acct-id (:account-id created)
+        resp    (handlers/verify-now
+                 (request "/auth/dev-verify" {}
+                          {:dev-verify? false
+                           :session {:account-id acct-id}}))]
+    (is (= 404 (:status resp))
+        "the bypass is not advertised where it is not enabled")
+    (is (false? (db/email-verified? (db/find-account-by-id sup/*db* acct-id)))
+        "and it leaves the account unverified")))
+
+(deftest verify-now-bounces-anonymous-visitors
+  (let [resp (handlers/verify-now
+              (request "/auth/dev-verify" {} {:dev-verify? true}))]
+    (is (= 302 (:status resp)))
+    (is (str/includes? (get-in resp [:headers "Location"]) "/auth/signin"))))
+
+(deftest verify-now-is-idempotent
+  (let [created (register-unverified!)
+        acct-id (:account-id created)
+        submit  #(handlers/verify-now
+                  (request "/auth/dev-verify" {}
+                           {:dev-verify? true
+                            :session {:account-id acct-id}}))]
+    (is (= 302 (:status (submit))))
+    (let [resp (submit)]
+      (is (= 302 (:status resp)))
+      (is (str/includes? (get-in resp [:headers "Location"]) "/dashboard"))
+      (is (db/email-verified? (db/find-account-by-id sup/*db* acct-id))))))
 
 ;;; sign out
 

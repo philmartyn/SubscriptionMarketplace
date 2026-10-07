@@ -36,6 +36,20 @@
                                          :account-type :vendor}}))]
     (is (str/includes? html "href=\"/vendor/dashboard\""))))
 
+(deftest the-dev-verify-button-appears-only-when-the-request-enables-it
+  (let [banner (fn [request] (body (home/home request)))
+        on     (banner {:session {:account-id 1 :verified? false}
+                        :system  {:config {:dev-verify? true}}})
+        off    (banner {:session {:account-id 1 :verified? false}})]
+    (is (str/includes? on "Simulate email click (dev)"))
+    (is (str/includes? on "hx-post=\"/auth/dev-verify\""))
+    (is (not (str/includes? off "Simulate email click (dev)"))
+        "the workaround is invisible unless the request turns it on")
+    (is (not (str/includes? (banner {:session {:account-id 1 :verified? true}
+                                     :system  {:config {:dev-verify? true}}})
+                            "Simulate email click (dev)"))
+        "a verified account has no verification banner to work around")))
+
 ;;; vendor dashboard
 
 (deftest the-vendor-dashboard-is-a-stub

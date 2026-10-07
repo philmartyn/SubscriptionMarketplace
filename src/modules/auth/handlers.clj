@@ -113,6 +113,29 @@
                                         (get-in request [:params :token])))]
     (redirect-to request (if ok? "/dashboard" "/auth/signin?verify=invalid"))))
 
+(defn verify-now
+  "POST /auth/dev-verify - the development stand-in for clicking the link in
+  the verification email.
+
+  Development has no real mailer yet, so this marks the signed-in account
+  verified directly, exactly as consuming the emailed token would. It is a
+  deliberate verification bypass, so it does nothing unless the :dev-verify?
+  flag is on: outside development the route answers 404 rather than
+  advertising itself. The real /auth/verify token path is untouched."
+  [request]
+  (cond
+    (not (get-in request [:system :config :dev-verify?]))
+    (http-response/not-found)
+
+    (nil? (get-in request [:session :account-id]))
+    (redirect-to request "/auth/signin")
+
+    :else
+    (do
+      (service/verify-account! (db request)
+                               (get-in request [:session :account-id]))
+      (redirect-to request "/dashboard"))))
+
 (defn resend-verification
   "POST /auth/resend-verification, from the dashboard banner of an account
   that has not verified yet."

@@ -18,6 +18,11 @@
                            ;; Used to build the verification link the signup
                            ;; path asks the mailer to send.
                            :base-url             #or [#env BASE_URL "http://localhost:3000"]
+                           ;; With no mailer wired yet, development gets a
+                           ;; button that marks an account verified directly.
+                           ;; It is a verification bypass, so it is off by
+                           ;; default and prod never resolves it to true.
+                           :dev-verify?          #profile {:dev true :test true :default false}
                            ;; Site defaults from ring.middleware.defaults.
                            :site-defaults-config {:params    {:urlencoded true
                                                               :multipart  true

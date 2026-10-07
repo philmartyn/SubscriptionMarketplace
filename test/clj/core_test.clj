@@ -108,3 +108,38 @@
               (is (not (str/includes? (:body dash) "not verified yet"))
                   "the account is verified and the banner is gone"))))))
     (sut/stop-app)))
+
+(deftest live-dev-verify-workaround-test
+  (let [server-config (get-in (config/system-config {:profile :test}) [:server/http])
+        base-path (host-base-path server-config)
+        email (str "dev-verify-" (System/currentTimeMillis) "@example.com")
+        cookies (cookies/cookie-store)]
+    (sut/start-app {:opts {:profile :test}})
+    (let [signup-page (client/get (str base-path "/auth/signup")
+                                  {:cookie-store cookies :as :text})
+          token (csrf-token (:body signup-page))]
+      (client/post (str base-path "/auth/signup")
+                   {:cookie-store cookies
+                    :form-params {"__anti-forgery-token" token
+                                  "name" "Dev Ada"
+                                  "email" email
+                                  "password" "an-appropriate-password!"}}))
+    (testing "the dev stand-in verifies without a real mailer"
+      (let [dash (client/get (str base-path "/dashboard")
+                             {:cookie-store cookies :as :text})]
+        (is (str/includes? (:body dash) "not verified yet"))
+        (is (str/includes? (:body dash) "Simulate email click (dev)")
+            "the button is offered in the test profile")
+        (let [verify (client/post (str base-path "/auth/dev-verify")
+                                  {:cookie-store cookies
+                                   :form-params
+                                   {"__anti-forgery-token" (csrf-token (:body dash))}})]
+          ;; clj-http does not follow a 302 on a POST by itself (only 303), so
+          ;; the redirect is asserted through its status and destination.
+          (is (= 302 (:status verify)))
+          (is (str/includes? (get-in verify [:headers "Location"]) "/dashboard"))
+          (let [after (client/get (str base-path "/dashboard")
+                                  {:cookie-store cookies :as :text})]
+            (is (not (str/includes? (:body after) "not verified yet"))
+                "the account is verified and the banner is gone")))))
+    (sut/stop-app)))

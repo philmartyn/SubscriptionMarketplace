@@ -26,6 +26,9 @@
    ["/auth/verify" {:get  auth.handlers/verify-email
                     :post auth.handlers/verify-email}]
    ["/auth/resend-verification" {:post auth.handlers/resend-verification}]
+   ;; Development only: stands in for clicking the emailed link while no real
+   ;; mailer is wired. The handler answers 404 unless :dev-verify? is on.
+   ["/auth/dev-verify" {:post auth.handlers/verify-now}]
    ["/auth/signout" {:post auth.handlers/signout}]
    ["/dashboard" {:get        home/home
                   :middleware [auth.middleware/wrap-auth-required]}]

@@ -11,9 +11,11 @@
 (defn home
   "GET /dashboard. The route guard has already confirmed a signed-in session."
   [request]
-  (let [session   (:session request)
-        verified? (:verified? session)
-        vendor?   (= :vendor (:account-type session))]
+  (let [session     (:session request)
+        verified?   (:verified? session)
+        vendor?     (= :vendor (:account-type session))
+        ;; The stand-in for the emailed link, which only exists in dev/test.
+        dev-verify? (get-in request [:system :config :dev-verify?])]
     (layout/page
      {:title       (str "Dashboard - " layout/site-name)
       :description "Manage your plans and deliveries."}
@@ -24,12 +26,18 @@
          [:span (str "Your email is not verified yet. Verification is required "
                      "before orders can be placed; the link in your inbox is "
                      "valid for 24 hours.")]
-         [:form {:class "mt-2"
-                 :action "/auth/resend-verification" :method "post"
-                 :hx-post "/auth/resend-verification" :hx-swap "outerHTML"}
-          (layout/csrf-field)
-          [:button {:type "submit" :class "btn btn-outline btn-sm"}
-           "Resend verification email"]]])
+         [:div {:class "mt-2 flex flex-wrap items-center gap-2"}
+          [:form {:action "/auth/resend-verification" :method "post"
+                  :hx-post "/auth/resend-verification" :hx-swap "outerHTML"}
+           (layout/csrf-field)
+           [:button {:type "submit" :class "btn btn-outline btn-sm"}
+            "Resend verification email"]]
+          (when dev-verify?
+            [:form {:action "/auth/dev-verify" :method "post"
+                    :hx-post "/auth/dev-verify" :hx-swap "outerHTML"}
+             (layout/csrf-field)
+             [:button {:type "submit" :class "btn btn-ghost btn-sm"}
+              "Simulate email click (dev)"]])]])
       (when vendor?
         [:div {:class "alert alert-info mt-4"}
          [:span "This is the subscriber account. "]
