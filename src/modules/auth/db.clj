@@ -208,6 +208,23 @@
                          :set   {:revoked_at (now-ts)}
                          :where [:and [:= :id session-id] [:= :revoked_at nil]]})))
 
+(defn revoke-session-by-token!
+  "Revoke the session a raw token identifies, in one statement.
+
+  Written for logout, which has only the cookie to go on. A read-then-revoke
+  pair would leave a window between the two, and would do nothing at all when
+  the session had already expired or been revoked - in which case there is
+  still nothing to revoke, but the caller should not have to care.
+
+  Returns rows changed."
+  [db token-hash]
+  (affected db
+            (sql/format {:update :sessions
+                         :set   {:revoked_at (now-ts)}
+                         :where [:and
+                                 [:= :token_hash token-hash]
+                                 [:= :revoked_at nil]]})))
+
 (defn revoke-all-sessions!
   "Sign out everywhere. Used on password change and by account owners."
   [db account-id]
