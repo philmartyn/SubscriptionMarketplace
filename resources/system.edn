@@ -48,7 +48,16 @@
                                                               :content-types          true
                                                               :default-charset        "utf-8"}}}
 
- :auth/mailer             {:capture? #profile {:dev true :test true :default false}}
+ :auth/mailer             {:capture? #profile {:dev true :test true :default false}
+                           ;; Production sends through Mailgun. The key is a
+                           ;; domain sending key (send-only), read from the
+                           ;; environment and never committed. Outside the
+                           ;; capture profiles both key and domain are required
+                           ;; and the component fails fast without them.
+                           :api-key  #or [#env MAILGUN_API_KEY nil]
+                           :domain   #or [#env MAILGUN_DOMAIN nil]
+                           :from     #or [#env MAILGUN_FROM "SubMarket <verify@sandbox35c210fabdb84877a42940866a26cf36.mailgun.org>"]
+                           :region   #or [#env MAILGUN_REGION "us"]}
 
  :reitit.routes/api       {:base-path "/api"
                            :env       #ig/ref :system/env}
