@@ -8,10 +8,15 @@
    [app.core]
    [app.handler]
    [clojure.string :as str]
+   [clojure.spec.alpha :as s]
+   [expound.alpha :as expound]
+   [clojure.tools.namespace.repl :as repl]
+   [integrant.core :as ig]
    [clojure.tools.namespace.repl :as tools]
    [components.db.core]
    [integrant.repl :as ig-repl :refer [clear go halt init prep reset reset-all]]
    [modules.auth.mailer :as mailer]
+   [lambdaisland.classpath.watch-deps :as watch-deps]
    [shared.config :as config]))
 
 (defn reset-app
@@ -48,6 +53,36 @@
       :body    (str "If you can read this, the Mailgun wiring works.\n\n"
                     "This is a manual smoke test, not a real verification "
                     "message.")})))
+
+
+;; uncomment to enable hot loading for deps
+(watch-deps/start! {:aliases [:dev :test]})
+
+(alter-var-root #'s/*explain-out* (constantly expound/printer))
+
+(add-tap (bound-fn* clojure.pprint/pprint))
+
+(defn dev-prep!
+  []
+  (integrant.repl/set-prep! (fn []
+                              (-> (shared.config/system-config {:profile :dev})
+                                  (ig/expand)))))
+
+(defn test-prep!
+  []
+  (integrant.repl/set-prep! (fn []
+                              (-> (shared.config/system-config {:profile :test})
+                                  (ig/expand)))))
+
+;; Can change this to test-prep! if want to run tests as the test profile in your repl
+;; You can run tests in the dev profile, too, but there are some differences between
+;; the two profiles.
+(dev-prep!)
+
+(repl/set-refresh-dirs "src/clj")
+
+(def refresh repl/refresh)
+
 
 ;; Useful at the REPL:
 ;;
