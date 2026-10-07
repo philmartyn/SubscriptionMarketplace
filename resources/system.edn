@@ -14,6 +14,10 @@
                            ;; the ref, which also orders construction: the
                            ;; database exists before anything builds a handler.
                            :database             #ig/ref :database.sql/connection
+                           :mailer               #ig/ref :auth/mailer
+                           ;; Used to build the verification link the signup
+                           ;; path asks the mailer to send.
+                           :base-url             #or [#env BASE_URL "http://localhost:3000"]
                            ;; Site defaults from ring.middleware.defaults.
                            :site-defaults-config {:params    {:urlencoded true
                                                               :multipart  true
@@ -38,6 +42,8 @@
                                                               :absolute-redirects     true
                                                               :content-types          true
                                                               :default-charset        "utf-8"}}}
+
+ :auth/mailer             {:capture? #profile {:dev true :test true :default false}}
 
  :reitit.routes/api       {:base-path "/api"
                            :env       #ig/ref :system/env}

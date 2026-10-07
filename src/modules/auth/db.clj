@@ -157,44 +157,75 @@
 
 ;;; sessions
 
+(defn- jsonb
+  "A JSONB literal for the driver, so a serialized session map is typed on its
+  way in instead of relying on Postgres to coerce a text parameter."
+  [s]
+  (doto (org.postgresql.util.PGobject.)
+    (.setType "jsonb")
+    (.setValue s)))
+
 (defn create-session!
-  [db {:keys [account-id token-hash expires-at ip user-agent]}]
+  "Insert a session row. account-id may be nil: a visitor holding only a CSRF
+  token gets a row too, and is attached to an account when they sign in. data
+  is the serialized session map; when absent the column default '{}' applies."
+  [db {:keys [account-id token-hash expires-at data ip user-agent]}]
   (one db
        (sql/format {:insert-into :sessions
-                    :values [{:account_id account-id
-                              :token_hash  token-hash
-                              :expires_at  (->ts expires-at)
-                              :ip          ip
-                              :user_agent  user-agent}]})
+                    :values [(cond-> {:account_id account-id
+                                      :token_hash  token-hash
+                                      :expires_at  (->ts expires-at)
+                                      :ip          ip
+                                      :user_agent  user-agent}
+                               ;; Omitting the key, not passing nil: an explicit
+                               ;; NULL would defeat the column's DEFAULT.
+                               (some? data) (assoc :data (jsonb data)))]})
        {:return-keys true}))
+
+(defn update-session!
+  "Persist a new session map under a token, attaching an account when given.
+
+  Called on every response that carries :session - sign-in attaches the account
+  id, flash messages rewrite the map. Returns rows changed."
+  [db token-hash {:keys [account-id data]}]
+  (affected db
+            (sql/format {:update :sessions
+                         :set    {:account_id account-id
+                                  :data       (jsonb data)}
+                         :where  [:and [:= :token_hash token-hash]
+                                  [:= :revoked_at nil]]})))
 
 (defn find-active-session
   "The session matching a token hash, only if it is still usable.
 
   A revoked session is not returned even while its row exists, and neither is
-  an expired one. Returns the session joined to its account so the caller does
-  not need a second round trip on every authenticated request.
+  an expired one. The join is a LEFT JOIN on purpose: an anonymous session has
+  no account row, and it must still come back readable - its session map is
+  what carries the anti-forgery token.
 
   Session columns are aliased because the account join would otherwise shadow
   :id and :created_at with the account's."
   [db token-hash]
   (one db
-       (sql/format {:select [[:sessions.id :session_id]
-                             [:sessions.created_at :session_created_at]
-                             [:accounts.id :account_id]
-                             [:accounts.email :email]
-                             [:accounts.email_normalized :email_normalized]
-                             [:accounts.password_hash :password_hash]
-                             [:accounts.account_type :account_type]
-                             [:accounts.email_verified_at :email_verified_at]]
-                    ;; honey.sql takes a join as a top-level :join clause whose
+       (sql/format {;; honey.sql takes a join as a top-level :join clause whose
                     ;; value is a flat sequence of [table condition table
                     ;; condition ...]. Writing it into :from instead reads as an
                     ;; alias and trips "illegal syntax in select expression",
                     ;; and an :on keyword misaligns the pairing into the same
-                    ;; error. This was never exercised by the probe scripts.
+                    ;; error.
+                    :select [[:sessions.id :session_id]
+                             [:sessions.account_id :account_id]
+                             [:sessions.token_hash :token_hash]
+                             [:sessions.data :data]
+                             [:sessions.expires_at :expires_at]
+                             [:sessions.revoked_at :revoked_at]
+                             [:sessions.created_at :session_created_at]
+                             [:accounts.email :email]
+                             [:accounts.email_normalized :email_normalized]
+                             [:accounts.account_type :account_type]
+                             [:accounts.email_verified_at :email_verified_at]]
                     :from   [:sessions]
-                    :join   [:accounts [:= :sessions.account_id :accounts.id]]
+                    :left-join [:accounts [:= :sessions.account_id :accounts.id]]
                     :where  [:and
                              [:= :sessions.token_hash token-hash]
                              [:= :sessions.revoked_at nil]

@@ -51,10 +51,18 @@
  {:id "004-create-sessions-table"
   :up ["CREATE TABLE sessions (
   id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  account_id BIGINT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   -- SHA-256 of the opaque session token. The token itself is never persisted,
   -- so a database leak does not yield usable sessions.
   token_hash TEXT NOT NULL UNIQUE,
+  -- Null until the visitor signs in. Ring's CSRF strategy keeps its
+  -- synchronizer token in the session map, so anyone holding a cookie needs a
+  -- row even before they have an account - an anonymous session is exactly
+  -- that: a cookie that only carries an anti-forgery token.
+  account_id BIGINT REFERENCES accounts(id) ON DELETE CASCADE,
+  -- The session map (CSRF token, flash, account enrolment) serialized as JSON.
+  -- A Ring session store must return exactly what write-session was given, so
+  -- the data is stored, not re-derived from the account columns.
+  data       JSONB NOT NULL DEFAULT '{}'::jsonb,
   expires_at TIMESTAMPTZ NOT NULL,
   revoked_at TIMESTAMPTZ,
   ip         TEXT,

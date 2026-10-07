@@ -1,7 +1,6 @@
 (ns modules.routes
   (:require
    [integrant.core :as ig]
-   [modules.auth.routes :as auth]
    [modules.health :as health]
    [reitit.coercion.malli :as malli]
    [reitit.ring.coercion :as coercion]
@@ -34,9 +33,7 @@
 
 ;; Routes
 (defn api-routes [_opts]
-  [(auth/routes)
-
-   ["/swagger.json"
+  [["/swagger.json"
     {:get {:no-doc  true
            :swagger {:info {:title "submarket.dashboard API"}}
            :handler (swagger/create-swagger-handler)}}]

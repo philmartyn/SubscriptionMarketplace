@@ -15,10 +15,19 @@
   The store is built once, here, so it holds the datasource the system already
   opened rather than opening one per request. Sessions are server side because
   they have to be revocable: signing out must invalidate the session even
-  though the browser still holds the cookie."
-  [{:keys [site-defaults-config database]}]
-  (let [store (auth.session/session-store database)]
+  though the browser still holds the cookie.
+
+  The components the auth handlers need - the database, the mailer and the
+  base url for verification links - ride on (:system request), attached inside
+  the defaults chain so the session and params are already parsed by the time
+  a handler reads them."
+  [{:keys [site-defaults-config database mailer base-url]}]
+  (let [store (auth.session/session-store database)
+        system {:db     database
+                :mailer mailer
+                :config {:base-url base-url}}]
     (fn [handler]
       (defaults/wrap-defaults
-       handler
+       (fn [request]
+         (handler (assoc request :system system)))
        (assoc-in site-defaults-config [:session :store] store)))))

@@ -1,15 +1,13 @@
 (ns views.auth-test
-  "Tests for the sign in and sign up pages.
+  "Tests for the sign in, sign up and vendor sign up pages.
 
-  These are UI only. /api/auth/signin and /api/auth/signup are GET-only stubs
-  returning nil, so nothing here asserts that submitting a form works; it
-  asserts the markup carries the wiring such a form would need.
-
-  Structural assertions run against the hiccup returned by auth-card, since a
-  rendered page is a flat string by the time a handler returns it."
+  These cover the markup: what each form posts to, what it collects, and the
+  CSRF field. The behaviour of the endpoints is covered by
+  modules.auth.handlers-test; a page test here stays a page test."
   (:require
    [clojure.string :as str]
-   [clojure.test :refer [deftest is testing]]
+   [clojure.test :refer [deftest is]]
+   [ring.middleware.anti-forgery :as anti-forgery]
    [views.auth :as auth]
    [views.support :as sup]))
 
@@ -19,40 +17,40 @@
   (:body resp))
 
 (defn- card
-  "The shared card as hiccup, in the given mode: signin or signup."
+  "The shared card as hiccup, in the given mode."
   [mode]
-  (auth/auth-card {:heading "Heading"
-                   :subheading "Subheading"
-                   :selected "email"
-                   :mode mode}))
+  (auth/auth-card {:mode mode}))
 
 (defn- inputs
-  "Every credential input in a card, by name.
-
-  The provider radios are inputs too, but they are tabs rather than fields."
+  "Every form input in a card, by name."
   [mode]
   (->> (sup/elements (card mode))
        (filter #(= :input (sup/tag %)))
-       (remove #(= "provider" (get (sup/attrs %) :name)))
        (into {} (map (juxt #(get (sup/attrs %) :name) identity)))))
 
-(deftest both-pages-respond-with-html
-  (doseq [[name resp] {"signin" (auth/signin nil)
-                       "signup" (auth/signup nil)}]
+(def pages
+  "The three auth pages and the titles they advertise."
+  {"signin"        {:resp (auth/signin nil)
+                    :title "Sign in - SubMarket"}
+   "signup"        {:resp (auth/signup nil)
+                    :title "Create an account - SubMarket"}
+   "vendor-signup" {:resp (auth/vendor-signup nil)
+                    :title "Vendor signup - SubMarket"}})
+
+(deftest every-page-responds-with-html
+  (doseq [[name {:keys [resp]}] pages]
     (is (= 200 (:status resp)) (str name " returns 200"))
     (is (= "text/html" (get-in resp [:headers "Content-Type"]))
         (str name " is html"))
     (is (re-find #"(?i)<!doctype html>" (body resp)))))
 
-(deftest both-pages-have-distinct-titles
-  (let [signin (body (auth/signin nil))
-        signup (body (auth/signup nil))]
-    (is (str/includes? signin "<title>Sign in - SubMarket</title>"))
-    (is (str/includes? signup "<title>Create an account - SubMarket</title>"))))
+(deftest every-page-has-a-distinct-title
+  (doseq [[name {:keys [resp title]}] pages]
+    (is (str/includes? (body resp) (str "<title>" title "</title>"))
+        (str name " is titled " title))))
 
-(deftest both-pages-are-titled-for-assistive-tech
-  (doseq [[name resp] {"signin" (auth/signin nil)
-                       "signup" (auth/signup nil)}]
+(deftest every-page-is-titled-for-assistive-tech
+  (doseq [[name {:keys [resp]}] pages]
     (is (= 1 (count (re-seq #"<h1" (body resp))))
         (str name " has exactly one h1"))
     (is (str/includes? (body resp) "name=\"description\"")
@@ -61,98 +59,100 @@
 ;;; forms
 
 (deftest each-form-posts-to-its-own-endpoint
-  (testing "signin"
-    (let [html (body (auth/signin nil))]
-      (is (str/includes? html "action=\"/auth/signin\""))
-      (is (str/includes? html "hx-post=\"/api/auth/signin\""))))
-  (testing "signup"
-    (let [html (body (auth/signup nil))]
-      (is (str/includes? html "action=\"/auth/signup\""))
-      (is (str/includes? html "hx-post=\"/api/auth/signup\"")))))
+  (doseq [[name {:keys [resp]}] (select-keys pages ["signin" "signup" "vendor-signup"])
+          :let [html (body resp)
+                endpoint (case name
+                           "signin" "/auth/signin"
+                           "signup" "/auth/signup"
+                           "vendor-signup" "/auth/vendor-signup")]]
+    (is (str/includes? html (str "action=\"" endpoint "\""))
+        (str name " posts to " endpoint))
+    (is (str/includes? html (str "hx-post=\"" endpoint "\""))
+        (str name " swaps the same endpoint via htmx"))))
 
-(deftest forms-work-without-htmx
-  (doseq [[name resp] {"signin" (auth/signin nil)
-                       "signup" (auth/signup nil)}]
+(deftest forms-submit-without-javascript
+  (doseq [[name {:keys [resp]}] pages]
     (is (re-find #"<form[^>]*method=\"post\"" (body resp))
         (str name " uses a plain post, so it submits without JavaScript"))))
 
 (deftest signin-asks-for-an-email-and-a-password
-  (let [fields (inputs "signin")]
+  (let [fields (inputs :signin)]
     (is (= #{"email" "password"} (set (keys fields)))
         "signin asks for exactly an email and a password")
     (doseq [[name input] fields]
       (is (:required (sup/attrs input))
           (str name " is required")))))
 
-(deftest signup-also-asks-for-a-name
-  (is (= #{"name" "email" "password"} (set (keys (inputs "signup"))))
-      "signup collects a name, an email and a password"))
+(deftest the-signup-pages-also-ask-for-a-name
+  (doseq [mode [:signup :vendor-signup]]
+    (is (= #{"name" "email" "password"} (set (keys (inputs mode))))
+        (str mode " collects a name, an email and a password"))))
 
 (deftest the-password-field-is-masked
-  (doseq [mode ["signin" "signup"]]
+  (doseq [mode [:signin :signup :vendor-signup]]
     (is (= "password" (:type (sup/attrs (get (inputs mode) "password"))))
         "a password must not be echoed in cleartext")))
 
-(deftest the-two-pages-cross-link
-  (is (str/includes? (body (auth/signin nil)) "href=\"/auth/signup\"")
-      "signin offers a route to signup")
-  (is (str/includes? (body (auth/signup nil)) "href=\"/auth/signin\"")
-      "signup offers a route back to signin"))
+(deftest the-pages-cross-link
+  (is (str/includes? (body (auth/signin nil)) "href=\"/auth/signup\""))
+  (is (str/includes? (body (auth/signin nil)) "href=\"/auth/vendor-signup\""))
+  (is (str/includes? (body (auth/signup nil)) "href=\"/auth/signin\""))
+  (is (str/includes? (body (auth/vendor-signup nil)) "href=\"/auth/signin\""))
+  (is (str/includes? (body (auth/vendor-signup nil)) "href=\"/auth/signup\"")
+      "a vendor can duck out of the vendor flow into the subscriber one"))
 
-;;; provider tabs
+(deftest forms-carry-a-csrf-token-when-one-is-bound
+  ;; Rendered inside the binding: the pages def above is evaluated at load
+  ;; time, before any test binding could be in effect.
+  (binding [anti-forgery/*anti-forgery-token* "page-token"]
+    (doseq [[name render] [["signin" auth/signin]
+                           ["signup" auth/signup]
+                           ["vendor-signup" auth/vendor-signup]]
+            :let [html (body (render nil))]]
+      (is (str/includes? html "name=\"__anti-forgery-token\"")
+          (str name " renders the anti-forgery field"))
+      (is (str/includes? html "value=\"page-token\"")
+          (str name " renders the token the session knows"))))
+  (is (not (str/includes? (body (auth/signin nil)) "__anti-forgery-token"))
+      "outside a request no token is bound, and no input is rendered"))
 
-(defn- providers
-  "The provider radio inputs of a card."
-  [mode]
-  (->> (sup/elements (card mode))
-       (filter #(and (= :input (sup/tag %))
-                     (= "provider" (get (sup/attrs %) :name))))
-       (mapv sup/attrs)))
+;;; errors
 
-(deftest the-provider-tabs-are-real-radio-inputs
-  (doseq [mode ["signin" "signup"]]
-    (let [radios (providers mode)]
-      (is (= #{"email" "google" "apple"} (into #{} (map :value) radios))
-          "email, Google and Apple are all offered")
-      (is (every? #(= "radio" (:type %)) radios)
-          "tabs are radios, so the form still submits if the script never runs"))))
+(deftest field-errors-render-next-to-their-input
+  (let [html (body (auth/page {:mode :signup
+                               :errors {:email "That does not look like an email address."}}))]
+    (is (str/includes? html "That does not look like an email address."))))
 
-(deftest email-is-selected-by-default
-  (doseq [mode ["signin" "signup"]]
-    (let [checked (filter :checked (providers mode))]
-      (is (= 1 (count checked)) (str mode ": exactly one tab is checked"))
-      (is (= "email" (:value (first checked))) (str mode ": email is preselected")))))
+(deftest a-form-level-error-renders-inside-the-form
+  (let [html (body (auth/page {:mode :signin
+                               :errors {:credentials "That email and password do not match."}}))]
+    (is (str/includes? html "That email and password do not match."))))
 
-(deftest only-the-email-panel-is-shown-initially
-  (doseq [mode ["signin" "signup"]]
-    (let [panels (->> (sup/elements (card mode))
-                      (filter #(:data-provider-panel (sup/attrs %)))
-                      (mapv sup/attrs))
-          visible (->> panels
-                       (remove :hidden)
-                       (mapv :data-provider-panel))]
-      (is (= 1 (count panels)) (str mode ": only the email form is a panel"))
-      (is (= ["email"] visible)
-          (str mode ": the email panel is the one shown by default")))))
+(deftest submitted-values-are-echoed-back-into-the-form
+  (let [html (body (auth/page {:mode :signup
+                               :values {:email "ada@example.com"}}))]
+    (is (str/includes? html "value=\"ada@example.com\""))))
 
-(deftest oauth-panels-offer-a-button-per-provider
+(deftest the-signin-page-documents-an-invalid-verification-link
+  (let [html (body (auth/signin {:params {:verify "invalid"}}))]
+    (is (str/includes? html "invalid or has already been used."))))
+
+;;; no providers
+
+(deftest there-is-no-provider-plumbing
   (let [html (body (auth/signin nil))]
-    (is (str/includes? html "Continue with Google"))
-    (is (str/includes? html "Continue with Apple"))))
+    (is (not (str/includes? html "Continue with Google")))
+    (is (not (str/includes? html "Continue with Apple")))
+    (is (not (str/includes? html "provider-tabs")))
+    (is (not (str/includes? html "data-provider-panel")))))
 
 ;;; chrome
 
-(deftest both-pages-get-the-shared-chrome
-  (doseq [[name resp] {"signin" (auth/signin nil)
-                       "signup" (auth/signup nil)}]
+(deftest every-page-gets-the-shared-chrome
+  (doseq [[name {:keys [resp]}] pages]
     (let [html (body resp)]
       (is (str/includes? html "class=\"navbar") (str name " has the navbar"))
       (is (str/includes? html "<footer") (str name " has the footer"))
       (is (str/includes? html "id=\"theme-toggle\"") (str name " has the theme toggle"))
       (is (str/includes? html "/js/htmx.min.js") (str name " loads htmx"))
       (is (str/includes? html "Skip to content") (str name " has a skip link")))))
-
-(deftest the-provider-switch-script-binds-when-htmx-swaps-the-body
-  (is (str/includes? auth/form-script "document.readyState")
-      (str "htmx inserts the body then runs scripts, so DOMContentLoaded never "
-           "fires again and the listener must bind on readyState instead")))

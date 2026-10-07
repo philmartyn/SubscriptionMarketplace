@@ -1,127 +1,150 @@
 (ns views.auth
   "Sign in and sign up pages.
 
-  These are UI only. The forms carry hx-post attributes pointing at the API as
-  the intended wiring, but /api/auth/signin is still a GET-only stub returning
-  nil, so submitting them does not do anything yet."
+  Email and password are the only methods offered; there is deliberately no
+  provider plumbing here. Each form carries action and hx-post pointing at the
+  same endpoint, so htmx swaps the reply in place and a plain POST renders the
+  same result without JavaScript.
+
+  Three modes share one card: signin, signup (a subscriber), and vendor-signup.
+  Subscribers and vendors are separate entities, signed up on separate pages
+  with separate endpoints.
+
+  Forms carry a hidden anti-forgery token whenever one is bound. Ring binds the
+  var during a real request; unit tests that call these functions directly run
+  with no token and see no hidden input, which is the honest shape for a page
+  rendered outside a request."
   (:require
+   [views.htmx :as htmx]
    [views.layout :as layout]))
 
-(def form-script
-  "Show the panel matching the selected provider.
+(def modes
+  "The three shapes a form takes: the endpoint it posts to, the fields it
+  collects, and the copy around it."
+  {:signin        {:heading     "Welcome back"
+                   :subheading  "Sign in to manage your plans and deliveries."
+                   :title       (str "Sign in - " layout/site-name)
+                   :description "Sign in to manage your subscriptions and saved plans."
+                   :action      "/auth/signin"
+                   :submit      "Sign in"
+                   :fields      [["email" "Email" "email" "email"]
+                                 ["password" "Password" "password" "current-password"]]}
+   :signup        {:heading     (str "Create your " layout/site-name " account")
+                   :subheading  "Subscribe to a plan and track your subscriptions."
+                   :title       (str "Create an account - " layout/site-name)
+                   :description (str "Create a " layout/site-name " account to subscribe to a plan.")
+                   :action      "/auth/signup"
+                   :submit      "Create account"
+                   :fields      [["name" "Name" "text" "name"]
+                                 ["email" "Email" "email" "email"]
+                                 ["password" "Password" "password" "new-password"]]}
+   :vendor-signup {:heading     (str "Create your vendor account")
+                   :subheading  "List a plan and manage your customer deliveries."
+                   :title       (str "Vendor signup - " layout/site-name)
+                   :description (str "Create a " layout/site-name " vendor account to list your plans.")
+                   :action      "/auth/vendor-signup"
+                   :submit      "Create vendor account"
+                   :fields      [["name" "Name" "text" "name"]
+                                 ["email" "Email" "email" "email"]
+                                 ["password" "Password" "password" "new-password"]]}})
 
-  The readyState check matters because this page is reached through hx-boost:
-  htmx inserts the new body and then runs its scripts, so readyState is already
-  'complete' and DOMContentLoaded will never fire again."
-  "window.addEventListener('DOMContentLoaded', bind);
- function bind() {
-  var group = document.getElementById('provider-tabs');
-  if (!group || group.dataset.bound === 'true') { return; }
-  group.dataset.bound = 'true';
-  group.addEventListener('change', function (e) {
-   var input = e.target;
-   if (input.name !== 'provider') { return; }
-   var panels = document.querySelectorAll('[data-provider-panel]');
-   for (var i = 0; i < panels.length; i++) {
-    panels[i].hidden = panels[i].getAttribute('data-provider-panel') !== input.value;
-   }
-  });
- }
- if (document.readyState !== 'loading') { bind(); }")
+(defn- mode-config [mode]
+  (get modes mode (get modes :signin)))
 
-(defn provider-tabs
-  "daisyUI radio tabs. The labels are real radio inputs so the form still works
-  as a plain submit without JavaScript."
-  [selected]
-  [:div {:id "provider-tabs" :class "tabs tabs-box mb-4"}
-   [:label {:class (str "tab " (when (= "email" selected) "tab-active"))}
-    [:input {:type "radio" :name "provider" :value "email" :checked (= "email" selected)}]
-    "Email"]
-   [:label {:class (str "tab " (when (= "google" selected) "tab-active"))}
-    [:input {:type "radio" :name "provider" :value "google" :checked (= "google" selected)}]
-    "Google"]
-   [:label {:class (str "tab " (when (= "apple" selected) "tab-active"))}
-    [:input {:type "radio" :name "provider" :value "apple" :checked (= "apple" selected)}]
-    "Apple"]])
+(defn- input-attrs
+  "Attributes for one credential input. A submitted value is echoed back only
+  for fields that are safe to echo - never a password."
+  [[id _label type autocomplete] {:keys [values]}]
+  (cond-> {:type          type
+           :id            id
+           :name          id
+           :required      true
+           :autocomplete  autocomplete
+           :class         "input w-full"
+           :placeholder   (case id
+                            "email" "you@example.com"
+                            "password" "Your password"
+                            "name" "Your name"
+                            "")}
+    (and (not= "password" id)
+         (some? (get values (keyword id))))
+    (assoc :value (get values (keyword id)))))
 
-(defn provider-button
-  [{:keys [provider]}]
-  [:button {:type "button"
-            :class "btn btn-outline btn-block"}
-   (case provider
-     "google" "Continue with Google"
-     "apple" "Continue with Apple"
-     "Continue with email")])
+(defn- cross-links
+  "Where to go instead, under the form."
+  [mode]
+  [:div {:class "mt-6 space-y-1 text-center text-sm text-base-content/70"}
+   (if (= mode :signin)
+     [:p [:span "New to " layout/site-name "? "]
+      [:a {:href "/auth/signup" :class "link link-primary"} "Create an account"]]
+     [:p [:span "Already have an account? "]
+      [:a {:href "/auth/signin" :class "link link-primary"} "Sign in"]])
+   (if (= mode :vendor-signup)
+     [:p [:span "Want to subscribe instead? "]
+      [:a {:href "/auth/signup" :class "link"} "Create a customer account"]]
+     [:p [:span "Selling something? "]
+      [:a {:href "/auth/vendor-signup" :class "link"} "Create a vendor account"]])])
 
-(defn email-panel
-  [provider-id fields submit-label]
-  [:div {:data-provider-panel provider-id :hidden (not= provider-id "email")}
-   (for [[id label type] fields]
-     ^{:key id}
-     [:label {:class "flex w-full flex-col gap-1"}
-      [:span {:class "text-sm font-medium"} label]
-      [:input {:type type
-               :name id
-               :id (str provider-id "-" id)
-               :required true
-               :autocomplete (if (= "password" id) "current-password" "email")
-               :class "input w-full"
-               :placeholder (case id
-                              "email" "you@example.com"
-                              "password" "Your password"
-                              "name" "Your name"
-                              "")}]])
-   [:button {:type "submit" :class "btn btn-primary btn-block mt-6"} submit-label]])
+(defn auth-form
+  "The credential form alone, so that htmx can swap this element in place of
+  the previous form without re-rendering the page around it."
+  [{:keys [mode errors] :as opts}]
+  (let [{:keys [action submit fields]} (mode-config mode)
+        form-error (:credentials errors)]
+    [:form {:action action :method "post" :hx-post action :hx-swap "outerHTML"}
+     (layout/csrf-field)
+     (when form-error
+       [:div {:class "alert alert-error mb-4"} [:span form-error]])
+     (for [field fields]
+       (let [[id label] field]
+         ^{:key id}
+         [:label {:class "flex w-full flex-col gap-1"}
+          [:span {:class "text-sm font-medium"} label]
+          [:input (input-attrs field opts)]
+          (when-let [error (get errors (keyword id))]
+            [:span {:class "mt-1 text-sm text-error"} error])]))
+     [:button {:type "submit" :class "btn btn-primary btn-block mt-6"} submit]
+     (cross-links mode)]))
 
 (defn auth-card
-  "Shared card shell for both pages."
-  [{:keys [heading subheading selected mode]}]
-  [:div {:class "flex min-h-[calc(100vh-8rem)] items-center justify-center py-12"}
-   [:div {:class "card w-full max-w-md border border-base-300 shadow-lg"}
-    [:div {:class "card-body"}
-     [:h1 {:class "card-title text-2xl"} heading]
-     [:p {:class "mb-6 text-sm text-base-content/70"} subheading]
-     [:form {:action (if (= "signup" mode) "/auth/signup" "/auth/signin")
-             :method "post"
-             :hx-post (if (= "signup" mode) "/api/auth/signup" "/api/auth/signin")
-             :hx-swap "outerHTML"}
-      (provider-tabs selected)
-      (email-panel
-       "email"
-       (if (= "signup" mode)
-         [["name" "Name" "text"] ["email" "Email" "email"] ["password" "Password" "password"]]
-         [["email" "Email" "email"] ["password" "Password" "password"]])
-       (if (= "signup" mode) "Create account" "Sign in"))
-      [:div {:class "divider my-4 text-xs uppercase opacity-60"} "or"]
-      [:div {:class "space-y-2"}
-       (provider-button {:provider "google"})
-       (provider-button {:provider "apple"})]
-      [:p {:class "mt-6 text-center text-sm text-base-content/70"}
-       (if (= "signup" mode)
-         [:span "Already have an account? " [:a {:href "/auth/signin" :class "link link-primary"} "Sign in"]]
-         [:span "New to " layout/site-name "? " [:a {:href "/auth/signup" :class "link link-primary"} "Create an account"]])]]]]])
+  "Shared card shell for a page: heading, copy, notice, and the form."
+  [{:keys [mode notice] :as opts}]
+  (let [{:keys [heading subheading]} (mode-config mode)]
+    [:div {:class "flex min-h-[calc(100vh-8rem)] items-center justify-center py-12"}
+     [:div {:class "card w-full max-w-md border border-base-300 shadow-lg"}
+      [:div {:class "card-body"}
+       [:h1 {:class "card-title text-2xl"} heading]
+       [:p {:class "mb-6 text-sm text-base-content/70"} subheading]
+       (when notice
+         [:div {:class "alert alert-info mb-4"} [:span notice]])
+       (auth-form opts)]]]))
+
+(defn page
+  "A complete document for one of the auth pages: chrome, card, form."
+  [{:keys [mode errors values notice]}]
+  (let [{:keys [title description]} (mode-config mode)]
+    (layout/page
+     {:title title :description description}
+     (auth-card {:mode mode :errors errors :values values :notice notice}))))
+
+(defn fragment
+  "Just the form, the response htmx swaps in after a failed submit."
+  [{:keys [mode errors values]}]
+  (htmx/pagelet {} (auth-form {:mode mode :errors errors :values values})))
 
 (defn signin
   "GET /auth/signin."
-  [_request]
-  (layout/page
-   {:title (str "Sign in - " layout/site-name)
-    :description "Sign in to manage your subscriptions and saved plans."}
-   [:script {:type "text/javascript"} form-script]
-   (auth-card {:heading "Welcome back"
-               :subheading "Sign in to manage your plans and deliveries."
-               :selected "email"
-               :mode "signin"})))
+  [request]
+  (page {:mode :signin
+         :notice (when (= "invalid" (get-in request [:params :verify]))
+                   "That verification link is invalid or has already been used.")}))
 
 (defn signup
-  "GET /auth/signup."
+  "GET /auth/signup - a subscriber account."
   [_request]
-  (layout/page
-   {:title (str "Create an account - " layout/site-name)
-    :description (str "Create a " layout/site-name
-                      " account to subscribe to a plan or to list your own.")}
-   [:script {:type "text/javascript"} form-script]
-   (auth-card {:heading (str "Create your " layout/site-name " account")
-               :subheading "Subscribe to a plan, or start selling your own products."
-               :selected "email"
-               :mode "signup"})))
+  (page {:mode :signup}))
+
+(defn vendor-signup
+  "GET /auth/vendor-signup - a vendor account."
+  [_request]
+  (page {:mode :vendor-signup}))

@@ -1,16 +1,44 @@
 (ns views.dashboard.home
-  (:require [views.htmx :refer [page]]
-            #_[submarket.dashboard.web.middleware.supertokens-sessions :as st]
-            #_[views.dashboard.auth :as auth]))
+  "The subscriber dashboard - the first surface behind authentication.
 
-(defn home [_request]
-  (page
-   {:lang "en"}
-   [:head
-    [:meta {:charset "UTF-8"}]
-    [:title "Htmx + Kit"]
-    [:link {:href "/output.css" :rel "stylesheet"}]
-    [:script {:src "https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" :defer true}]]
-   [:body
-    [:h1 "Welcome to Htmx + Kit "]
-    [:button.btn "Default"]]))
+  What the auth flow needs from this page: it renders while email verification
+  is still pending, it offers the form that resends the verification link, and
+  it signs the session out. The marketplace itself (plans, subscriptions,
+  payments) is not built yet, so the page says so rather than pretending."
+  (:require
+   [views.layout :as layout]))
+
+(defn home
+  "GET /dashboard. The route guard has already confirmed a signed-in session."
+  [request]
+  (let [session   (:session request)
+        verified? (:verified? session)
+        vendor?   (= :vendor (:account-type session))]
+    (layout/page
+     {:title       (str "Dashboard - " layout/site-name)
+      :description "Manage your plans and deliveries."}
+     [:div {:class "mx-auto w-full max-w-3xl px-4 py-10"}
+      [:h1 {:class "text-2xl font-bold"} "Your dashboard"]
+      (when-not verified?
+        [:div {:class "alert alert-info mt-4"}
+         [:span (str "Your email is not verified yet. Verification is required "
+                     "before orders can be placed; the link in your inbox is "
+                     "valid for 24 hours.")]
+         [:form {:class "mt-2"
+                 :action "/auth/resend-verification" :method "post"
+                 :hx-post "/auth/resend-verification" :hx-swap "outerHTML"}
+          (layout/csrf-field)
+          [:button {:type "submit" :class "btn btn-outline btn-sm"}
+           "Resend verification email"]]])
+      (when vendor?
+        [:div {:class "alert alert-info mt-4"}
+         [:span "This is the subscriber account. "]
+         [:a {:href "/vendor/dashboard" :class "link link-primary"}
+          "Your vendor dashboard"]])
+      [:div {:class "mt-8 text-sm text-base-content/70"}
+       "Plans, deliveries and billing will live here."]
+      [:form {:class "mt-8"
+              :action "/auth/signout" :method "post"
+              :hx-post "/auth/signout" :hx-swap "outerHTML"}
+       (layout/csrf-field)
+       [:button {:type "submit" :class "btn btn-outline btn-sm"} "Sign out"]]])))

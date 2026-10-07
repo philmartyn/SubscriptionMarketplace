@@ -9,7 +9,8 @@
   what runs, and verification links are visible in the logs and nowhere else,
   which is the point at which a provider has to be chosen."
   (:require
-   [clojure.tools.logging :as log]))
+   [clojure.tools.logging :as log]
+   [integrant.core :as ig]))
 
 (defprotocol Mailer
   (send-email [this message]
@@ -54,3 +55,27 @@
   (boolean (some #(= email (:to %)) (if (instance? clojure.lang.IDeref messages)
                                       @messages
                                       messages))))
+
+;;; component
+
+;; Where the system's mailer puts what it sends while capture? is on, so a
+;; live HTTP test can reach the verification link that a real provider would
+;; have delivered.
+(defonce ^:private captured-messages-atom (atom []))
+
+(defn captured-messages
+  "Everything the system's mailer has been asked to send since boot or the
+  last reset. Messages carry :to, :subject and :body - the body holds the
+  verification url."
+  []
+  @captured-messages-atom)
+
+(defn reset-captured!
+  []
+  (reset! captured-messages-atom []))
+
+(defmethod ig/init-key :auth/mailer
+  [_ {:keys [capture?] :or {capture? false}}]
+  (if capture?
+    (->RecordingMailer captured-messages-atom)
+    (logging-mailer)))

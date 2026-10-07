@@ -6,6 +6,7 @@
   (:require
    [clojure.java.io :as io]
    [clojure.string :as str]
+   [ring.middleware.anti-forgery :as anti-forgery]
    [views.htmx :as htmx]))
 
 (defn css-href
@@ -25,6 +26,21 @@
                    .openConnection
                    .getLastModified)
            0)))
+
+(defn csrf-field
+  "The hidden token ring-anti-forgery expects on unsafe requests.
+
+  wrap-anti-forgery binds the var for the duration of a real request; outside
+  one it is unbound, and no input is rendered. Pages rendered in unit tests
+  without middleware therefore get no token, which is the honest shape for a
+  form outside any request.
+
+  bound? is the guard rather than a bare force of the var: reading an unbound
+  var yields a truthy Unbound marker, which would otherwise render as a token."
+  []
+  (when (bound? #'anti-forgery/*anti-forgery-token*)
+    (when-let [token (force anti-forgery/*anti-forgery-token*)]
+      [:input {:type "hidden" :name "__anti-forgery-token" :value token}])))
 
 (defn anchor-attrs
   "Attrs for an internal link.

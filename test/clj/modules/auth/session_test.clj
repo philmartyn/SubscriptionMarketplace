@@ -3,7 +3,11 @@
 
   The property being protected is revocability: a session that was signed out
   must stop working even though a browser may still hold the cookie, and the
-  stored value must not be the token itself."
+  stored value must not be the token itself.
+
+  The other half is fidelity: a Ring session store must give back the session
+  map it was given, because something real lives in that map - the anti-forgery
+  token. An anonymous visitor's session exists precisely to carry it."
   (:require
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing use-fixtures]]
@@ -88,17 +92,49 @@
 
 ;;; writing
 
-(deftest an-existing-session-is-not-rewritten
-  (let [account (account!)
-        token (login! (:id account))
-        again (store/write-session (the-store) token {:account-id 999})]
-    (is (= token again) "the cookie stays stable across requests")
-    (is (= 1 (count (session-rows))) "and no second row is opened")))
+(def ^:private csrf-key
+  "The key Ring's session strategy stores its synchronizer token under."
+  :ring.middleware.anti-forgery/anti-forgery-token)
 
-(deftest a-session-without-an-account-is-not-persisted
-  (let [token (store/write-session (the-store) nil {:account-id nil})]
-    (is (nil? token) "there is nothing such a session could authenticate")
-    (is (empty? (session-rows)) "and no row was written")))
+(def csrf-map
+  "The session map an unauthenticated visitor holding a form page is given."
+  {csrf-key "the-anti-forgery-token"})
+
+(deftest an-existing-session-keeps-its-token-and-updates-its-data
+  (let [token (store/write-session (the-store) nil csrf-map)
+        same (store/write-session (the-store) token (assoc csrf-map :notice "hi"))]
+    (is (= token same) "the cookie stays stable across requests")
+    (is (= 1 (count (session-rows))) "and no second row is opened")
+    (is (= "hi" (:notice (store/read-session (the-store) token)))
+        "a later write under the same token is a rewrite, not a new session")))
+
+(deftest an-anonymous-session-is-persisted-and-readable
+  ;; Ring's anti-forgery middleware writes its token into the session map
+  ;; before the visitor has any account. If that row does not exist, the POST
+  ;; that follows has nothing to compare the form token against and fails with
+  ;; 403 for everyone.
+  (let [token (store/write-session (the-store) nil csrf-map)
+        read (store/read-session (the-store) token)]
+    (is (string? token) "a cookie is issued so the token survives the page")
+    (is (= csrf-map read)
+        "exactly what was written comes back - the token Ring validates")
+    (is (not (contains? read :account-id))
+        "an anonymous session is not half-authenticated")
+    (is (= 1 (count (session-rows))))))
+
+(deftest signing-in-attaches-the-account-to-the-session
+  (let [account (account!)
+        token (store/write-session (the-store) nil csrf-map)]
+    (store/write-session (the-store) token (assoc csrf-map :account-id (:id account)))
+    (let [read (store/read-session (the-store) token)]
+      (is (= (:id account) (:account-id read)))
+      (is (= :user (:account-type read)))
+      (is (= csrf-map
+             (select-keys read (keys csrf-map)))
+          "the CSRF token survives sign-in on the same row"))
+    (is (= 1 (count (session-rows))) "no second session was opened")))
+
+;;; signing out
 
 (deftest each-account-gets-its-own-session
   (let [one (account! "one@example.com")
