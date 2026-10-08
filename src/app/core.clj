@@ -11,9 +11,8 @@
 ;; log uncaught exceptions in threads
 (Thread/setDefaultUncaughtExceptionHandler
  (fn [thread ex]
-   (log/error {:what "Uncaught exception in thread"
-               :exception ex
-               :where (.getName thread)})))
+   (log/error ex "Uncaught exception in thread"
+              {:where (.getName thread)})))
 
 (defonce system (atom nil))
 

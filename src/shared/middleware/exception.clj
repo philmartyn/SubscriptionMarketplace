@@ -6,7 +6,10 @@
 (defn handler [message status exception request]
   (when (>= status 500)
     ;; You can optionally use this to report error to an external service
-    (log/error exception))
+    (log/error exception message
+               {:uri (:uri request)
+                :method (:request-method request)
+                :status status}))
   {:status status
    :body   {:message   message
             :exception (.getClass exception)

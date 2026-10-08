@@ -4,6 +4,7 @@
 /resources/public/output.css
 /.clj-kondo/
 /.nrepl-port
+/log/
 
 # macOS
 .DS_Store

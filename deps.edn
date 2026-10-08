@@ -21,8 +21,8 @@
            ring/ring-defaults                {:mvn/version "0.6.0"}
 
            ;; Logging
-           ch.qos.logback/logback-classic  {:mvn/version "1.5.16"}
-           com.taoensso/telemere             {:mvn/version "1.0.1"}
+           ch.qos.logback/logback-classic     {:mvn/version "1.5.16"}
+           org.clojure/tools.logging          {:mvn/version "1.3.0"}
 
 
            ;; Data coercion
@@ -61,6 +61,7 @@
            :db    {:main-opts ["-m" "components.db.cli"]}
 
            :dev   {:extra-paths ["dev"]
+                   :jvm-opts    ["-DSUB_MARKET_LOG_LEVEL=DEBUG"]
                    :extra-deps  {com.lambdaisland/classpath      {:mvn/version "0.5.48"}
                                  dev.weavejester/ragtime         {:mvn/version "0.11.0"}
                                  criterium/criterium             {:mvn/version "0.4.6"}
@@ -73,7 +74,8 @@
                                  io.github.kit-clj/kit-generator {:mvn/version "0.2.5"}
                                  org.clojure/tools.namespace     {:mvn/version "1.4.4"}}}
 
-           :nrepl {:extra-deps {nrepl/nrepl {:mvn/version "1.1.0"}}
+           :nrepl {:jvm-opts    ["-DSUB_MARKET_LOG_LEVEL=DEBUG"]
+                    :extra-deps {nrepl/nrepl {:mvn/version "1.1.0"}}
                    :main-opts  ["-m" "nrepl.cmdline" "-i"]}
 
            :check {:replace-deps {dev.weavejester/cljfmt {:mvn/version "0.13.0"}}
