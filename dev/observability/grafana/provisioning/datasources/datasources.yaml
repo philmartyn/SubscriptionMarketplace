@@ -1,0 +1,22 @@
+# Grafana datasources, provisioned on startup so there is nothing to click
+# through before the first query.
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+
+  - name: Tempo
+    uid: tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    jsonData:
+      # Let a span's service/trace jump to the matching metric series.
+      tracesToMetrics:
+        datasourceUid: prometheus

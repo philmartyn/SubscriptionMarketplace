@@ -20,9 +20,84 @@ services:
       timeout: 5s
       retries: 5
 
+  # --- Observability stack (opt-in) ---------------------------------------
+  # Behind a compose profile, so a plain `docker compose up` still starts only
+  # Postgres. Bring these up with:
+  #   docker compose --profile observability up -d
+  # Config lives in dev/observability/. The app runs on the host, so the
+  # collector's OTLP ports are published for it to reach.
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.162.0
+    profiles: ["observability"]
+    command: ["--config=/etc/otel-collector.yaml"]
+    volumes:
+      - ./dev/observability/otel-collector.yaml:/etc/otel-collector.yaml:ro
+    ports:
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+      - "8889:8889" # Prometheus exporter (debugging)
+    networks:
+      - app_network
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.13.4
+    profiles: ["observability"]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yaml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+    volumes:
+      - ./dev/observability/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - app_network
+    restart: unless-stopped
+
+  tempo:
+    image: grafana/tempo:3.1.0
+    profiles: ["observability"]
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./dev/observability/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - "3200:3200" # Tempo query frontend / API
+    networks:
+      - app_network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:13.0.10
+    profiles: ["observability"]
+    depends_on:
+      - prometheus
+      - tempo
+    environment:
+      # Local, disposable credentials. Grafana binds to 3001 on the host
+      # because the app already owns 3000.
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./dev/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./dev/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    networks:
+      - app_network
+    restart: unless-stopped
+
 networks:
   app_network:
     driver: bridge
 
 volumes:
   pgdata:
+  prometheus-data:
+  tempo-data:
+  grafana-data:

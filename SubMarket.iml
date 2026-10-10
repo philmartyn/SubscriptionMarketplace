@@ -54,11 +54,11 @@
     <orderEntry type="library" name="Deps: mvxcvi/puget:1.1.2" level="project" />
     <orderEntry type="library" name="Deps: ring/ring-ssl:0.4.0" level="project" />
     <orderEntry type="library" name="Deps: org.ring-clojure/ring-websocket-middleware:0.2.1" level="project" />
+    <orderEntry type="library" name="Deps: io.opentelemetry/opentelemetry-api:1.66.0" level="project" />
     <orderEntry type="library" name="Deps: dev.weavejester/ragtime.next-jdbc:0.11.0" level="project" />
     <orderEntry type="library" name="Deps: lambdaisland/clj-diff:1.4.78" level="project" />
     <orderEntry type="library" name="Deps: org.eclipse.jetty/jetty-http:9.4.48.v20220622" level="project" />
     <orderEntry type="library" name="Deps: org.eclipse.jetty/jetty-util:9.4.48.v20220622" level="project" />
-    <orderEntry type="library" name="Deps: com.taoensso/encore:3.146.1" level="project" />
     <orderEntry type="library" name="Deps: org.slf4j/jcl-over-slf4j:1.7.36" level="project" />
     <orderEntry type="library" name="Deps: metosin/spec-tools:0.10.8" level="project" />
     <orderEntry type="library" name="Deps: io.github.cognitect-labs/test-runner:dfb30d" level="project" />
@@ -128,7 +128,7 @@
     <orderEntry type="library" name="Deps: io.methvin/directory-watcher:0.18.0" level="project" />
     <orderEntry type="library" name="Deps: org.bouncycastle/bcprov-jdk18on:1.78.1" level="project" />
     <orderEntry type="library" name="Deps: metosin/reitit-core:0.11.0" level="project" />
-    <orderEntry type="library" name="Deps: com.taoensso/truss:2.1.1" level="project" />
+    <orderEntry type="library" name="Deps: io.opentelemetry/opentelemetry-context:1.66.0" level="project" />
     <orderEntry type="library" name="Deps: ring/ring-headers:0.4.0" level="project" />
     <orderEntry type="library" name="Deps: org.apache.maven.resolver/maven-resolver-api:1.8.2" level="project" />
     <orderEntry type="library" name="Deps: com.fasterxml.jackson.core/jackson-annotations:2.22" level="project" />
@@ -153,6 +153,7 @@
     <orderEntry type="library" name="Deps: com.google.guava/guava:31.1-android" level="project" />
     <orderEntry type="library" name="Deps: org.clojure/data.xml:0.2.0-alpha8" level="project" />
     <orderEntry type="library" name="Deps: metosin/reitit-schema:0.11.0" level="project" />
+    <orderEntry type="library" name="Deps: io.opentelemetry/opentelemetry-common:1.66.0" level="project" />
     <orderEntry type="library" name="Deps: borkdude/dynaload:0.3.5" level="project" />
     <orderEntry type="library" name="Deps: org.apache.maven.resolver/maven-resolver-spi:1.8.2" level="project" />
     <orderEntry type="library" name="Deps: com.lambdaisland/classpath:0.5.48" level="project" />
@@ -254,6 +255,5 @@
     <orderEntry type="library" name="Deps: javax.xml.bind/jaxb-api:2.4.0-b180830.0359" level="project" />
     <orderEntry type="library" name="Deps: metosin/sieppari:0.0.0-alpha13" level="project" />
     <orderEntry type="library" name="Deps: metosin/reitit-interceptors:0.11.0" level="project" />
-    <orderEntry type="library" name="Deps: com.taoensso/telemere:1.0.1" level="project" />
   </component>
 </module>

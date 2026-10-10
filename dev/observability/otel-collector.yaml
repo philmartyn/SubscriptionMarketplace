@@ -1,0 +1,46 @@
+# OpenTelemetry Collector for local development.
+#
+# The app's Java agent speaks OTLP only; the collector is the hub that turns
+# that into the two things Grafana reads here: traces into Tempo, and metrics
+# into a Prometheus scrape endpoint. Adding Loki later means one more exporter
+# and a logs pipeline, nothing else.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # Batch before export; the agent already batches, so this is mostly to keep
+  # the exporter calls cheap.
+  batch: {}
+
+exporters:
+  # Traces go straight to Tempo over OTLP.
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+
+  # Metrics are exposed for Prometheus to scrape. Prometheus only knows how to
+  # pull, so the collector publishes a /metrics endpoint it can scrape.
+  # resource_to_telemetry_conversion turns resource attributes such as
+  # service.name into labels, which is how dashboards filter per service.
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    resource_to_telemetry_conversion:
+      enabled: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp/tempo]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [prometheus]

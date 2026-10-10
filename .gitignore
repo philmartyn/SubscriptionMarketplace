@@ -6,5 +6,8 @@
 /.nrepl-port
 /log/
 
+# Fetched by dev/observability/fetch-agent.sh - not committed, ~26 MB.
+/dev/observability/opentelemetry-javaagent.jar
+
 # macOS
 .DS_Store

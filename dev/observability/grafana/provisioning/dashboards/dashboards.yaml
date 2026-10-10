@@ -1,0 +1,15 @@
+# Load dashboards from disk, so the starter dashboard is version controlled
+# rather than stored in Grafana's database.
+
+apiVersion: 1
+
+providers:
+  - name: submarket
+    orgId: 1
+    folder: ""
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
