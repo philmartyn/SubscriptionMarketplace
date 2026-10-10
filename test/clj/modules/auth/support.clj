@@ -23,7 +23,10 @@
   {:memory 256 :iterations 1 :parallelism 1})
 
 (def ^:private auth-tables
-  ["accounts" "users" "vendors" "sessions" "verification_tokens"])
+  "Accounts owns the profile rows, so truncating it cascades to users, vendors
+  and products anyway. products is listed explicitly so its identity is reset
+  too, which is what lets a test assert on a product id."
+  ["accounts" "users" "vendors" "products" "sessions" "verification_tokens"])
 
 (def ^:private db-spec
   (delay (get-in (config/system-config {:profile :test})

@@ -16,6 +16,20 @@
   display: none;
 }
 
+/* Transient confirmations for #toasts. htmx removes the node once the
+   animation has run; the keyframes also fade it out and hide it, so a toast
+   cannot linger on screen if scripting is off. */
+@keyframes toast-pop {
+  0%   { opacity: 0; transform: translateY(-0.5rem); }
+  10%  { opacity: 1; transform: translateY(0); }
+  85%  { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-0.5rem); visibility: hidden; }
+}
+
+.toast-pop {
+  animation: toast-pop 4s ease-in-out forwards;
+}
+
 /* Anchor targets sit below the sticky navbar without a fixed offset. */
 [id] {
   scroll-margin-top: 5rem;

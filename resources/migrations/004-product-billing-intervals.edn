@@ -1,0 +1,31 @@
+;; A product's billing intervals become a set, and that set may be empty.
+;;
+;; The old single NOT NULL billing_interval could express exactly one choice,
+;; which cannot say "the customer picks" or "any of these". A product now allows
+;; zero or more intervals:
+;;
+;;   * no rows    - the vendor does not restrict the schedule; the buyer chooses
+;;   * some rows  - the vendor limits the product to those schedules, and the
+;;                  buyer picks one of them when subscribing
+;;
+;; A child table rather than an array column: the allowed values are already a
+;; closed set with a CHECK, the join is trivial at this scale, and subscriptions
+;; will eventually want to reference the interval the buyer chose.
+[
+
+ {:id "013-create-product-billing-intervals"
+  :up ["CREATE TABLE product_billing_intervals (
+  product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  interval   TEXT NOT NULL CHECK (interval IN ('weekly', 'monthly', 'yearly')),
+  -- One row per interval; the primary key is also the lookup index.
+  PRIMARY KEY (product_id, interval)
+);"]
+  :down ["DROP TABLE product_billing_intervals;"]}
+
+ {:id "014-drop-products-billing-interval"
+  :up ["ALTER TABLE products DROP COLUMN billing_interval;"]
+  :down ["ALTER TABLE products
+  ADD COLUMN billing_interval TEXT NOT NULL DEFAULT 'monthly'
+    CHECK (billing_interval IN ('weekly', 'monthly', 'yearly'));"]}
+
+ ]

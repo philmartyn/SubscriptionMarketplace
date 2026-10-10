@@ -52,14 +52,15 @@
 
 ;;; vendor dashboard
 
-(deftest the-vendor-dashboard-is-a-stub
+(deftest the-vendor-dashboard-points-at-product-management
   (let [resp (vendor/home {:session {:account-id 1
                                      :verified? true
                                      :account-type :vendor}})
         html (body resp)]
     (is (= 200 (:status resp)))
     (is (str/includes? html "Vendor dashboard"))
-    (is (str/includes? html "Plans, orders and payouts will live here."))
+    (is (str/includes? html "href=\"/vendor/products\""))
+    (is (str/includes? html "Orders and payouts will live here."))
     (is (str/includes? html "Sign out"))))
 
 (deftest the-vendor-dashboard-asks-for-verification-while-pending

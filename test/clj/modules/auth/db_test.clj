@@ -10,7 +10,8 @@
    [modules.auth.crypto :as crypto]
    [modules.auth.db :as db]
    [modules.auth.support :as sup]
-   [next.jdbc :as jdbc]))
+   [next.jdbc :as jdbc]
+   [shared.db :as sdb]))
 
 (use-fixtures :each
   sup/with-db
@@ -55,7 +56,7 @@
                                     :token-hash hash
                                     :expires-at (if expired?
                                                   (.minus (java.time.Instant/now) (java.time.Duration/ofHours 1))
-                                                  (db/expiry 1))})
+                                                  (sdb/expiry 1))})
     hash))
 
 (defn- session!
@@ -66,7 +67,7 @@
                          :token-hash hash
                          :expires-at (if expired?
                                        (.minus (java.time.Instant/now) (java.time.Duration/ofDays 1))
-                                       (db/expiry 30))})
+                                       (sdb/expiry 30))})
     hash))
 
 ;;; registration

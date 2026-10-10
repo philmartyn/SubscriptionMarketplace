@@ -143,3 +143,82 @@
             (is (not (str/includes? (:body after) "not verified yet"))
                 "the account is verified and the banner is gone")))))
     (sut/stop-app)))
+
+(deftest live-vendor-product-listing-flow-test
+  (let [server-config (get-in (config/system-config {:profile :test}) [:server/http])
+        base-path (host-base-path server-config)
+        suite (str (System/currentTimeMillis))
+        cookies (cookies/cookie-store)]
+    (sut/start-app {:opts {:profile :test}})
+    (mailer/reset-captured!)
+    (testing "the products page is guarded from anonymous visitors"
+      (is (redirected-to? (client/get (str base-path "/vendor/products")) "/auth/signin")))
+    (testing "a vendor signs up, verifies and lists a product"
+      (let [page (client/get (str base-path "/auth/vendor-signup")
+                             {:cookie-store cookies :as :text})]
+        (client/post (str base-path "/auth/vendor-signup")
+                     {:cookie-store cookies
+                      :form-params {"__anti-forgery-token" (csrf-token (:body page))
+                                    "name" "Produce Co"
+                                    "email" (str "vendor-" suite "@example.com")
+                                    "password" "an-appropriate-password!"}}))
+      (let [dash (client/get (str base-path "/vendor/dashboard")
+                             {:cookie-store cookies :as :text})]
+        (is (= 200 (:status dash)))
+        (is (str/includes? (:body dash) "not verified yet"))
+        (client/post (str base-path "/auth/dev-verify")
+                     {:cookie-store cookies
+                      :form-params {"__anti-forgery-token" (csrf-token (:body dash))}}))
+      (let [products-page (client/get (str base-path "/vendor/products")
+                                      {:cookie-store cookies :as :text})]
+        (is (= 200 (:status products-page)))
+        (is (str/includes? (:body products-page) "Add a product"))
+        (is (str/includes? (:body products-page) "You have not listed any products yet.")))
+      ;; The create form lives in the modal, reached through /new, and that is
+      ;; where the token for the submit comes from.
+      (let [new-form (client/get (str base-path "/vendor/products/new")
+                                 {:cookie-store cookies :as :text})]
+        (is (= 200 (:status new-form)))
+        (is (str/includes? (:body new-form) "name=\"billing-intervals\""))
+        (client/post (str base-path "/vendor/products")
+                     {:cookie-store cookies
+                      :form-params {"__anti-forgery-token" (csrf-token (:body new-form))
+                                    "name" "Weekly box"
+                                    "description" "Fresh produce"
+                                    "price" "12.50"
+                                    "currency" "EUR"
+                                    "billing-intervals" ["monthly" "weekly"]
+                                    "category" "Produce"
+                                    "image-url" "https://example.com/box.png"}}))
+      (let [listed (client/get (str base-path "/vendor/products")
+                               {:cookie-store cookies :as :text})]
+        (is (str/includes? (:body listed) "Weekly box"))
+        (is (str/includes? (:body listed) "12.50 EUR"))
+        (is (str/includes? (:body listed) "Monthly"))
+        (is (str/includes? (:body listed) "Weekly")))
+      (testing "the vendor can take a product off the market"
+        (let [page  (client/get (str base-path "/vendor/products")
+                                {:cookie-store cookies :as :text})
+              pid   (second (re-find #"/vendor/products/(\d+)/active" (:body page)))
+              after (client/post (str base-path "/vendor/products/" pid "/active")
+                                 {:cookie-store cookies
+                                  :form-params  {"__anti-forgery-token" (csrf-token (:body page))
+                                                 "active" "false"}})]
+          (is (some? pid) "the card renders an activate/deactivate control")
+          (is (str/includes? (:body after) "Inactive"))
+          (is (str/includes? (:body after) "Activate")
+              "an inactive product offers to be turned back on"))))
+    (testing "a subscriber cannot reach the vendor products page"
+      (let [sub  (cookies/cookie-store)
+            page (client/get (str base-path "/auth/signup")
+                             {:cookie-store sub :as :text})]
+        (client/post (str base-path "/auth/signup")
+                     {:cookie-store sub
+                      :form-params {"__anti-forgery-token" (csrf-token (:body page))
+                                    "name" "Sub"
+                                    "email" (str "sub-" suite "@example.com")
+                                    "password" "an-appropriate-password!"}})
+        (is (redirected-to? (client/get (str base-path "/vendor/products")
+                                        {:cookie-store sub})
+                            "/dashboard"))))
+    (sut/stop-app)))

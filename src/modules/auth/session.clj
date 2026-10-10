@@ -25,7 +25,8 @@
    [jsonista.core :as json]
    [modules.auth.crypto :as crypto]
    [modules.auth.db :as db]
-   [ring.middleware.session.store :as store]))
+   [ring.middleware.session.store :as store]
+   [shared.db :as sdb]))
 
 (def ^:private ttl-days
   "How long a session survives without being renewed."
@@ -92,7 +93,7 @@
         (db/create-session! database
                             {:account-id (:account-id data)
                              :token-hash  (hash-of fresh)
-                             :expires-at  (db/expiry ttl-days)
+                             :expires-at  (sdb/expiry ttl-days)
                              :data        (encode data)})
         fresh)))
 

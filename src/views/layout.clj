@@ -168,6 +168,36 @@
      (str site-name " - a subscription marketplace for any product.")]
     [:p {:class "text-sm opacity-70"} "© 2026 SubMarket. All rights reserved."]]])
 
+(defn toast
+  "A transient confirmation for the top-right corner.
+
+  Rendered as an out-of-band append to #toasts, it removes itself once the
+  animation has run. The CSS also fades it out and hides it, so a toast never
+  lingers even if scripting is off.
+
+  The styled box sits inside a plain carrier that carries hx-swap-oob. htmx
+  appends the *content* of a non-inline out-of-band element, not the element
+  itself (see oobSwap: \"if this is not an inline swap, we use the content of
+  the node\"), so styling the carrier would leave only its bare children, which
+  renders as plain text. The colours and layout are spelled out with utilities
+  rather than left to daisyUI's .alert, whose visual styles sit in a nested
+  cascade layer; tones are literals because Tailwind scans source text and never
+  sees an assembled class name."
+  ([message] (toast :success message))
+  ([kind message]
+   (let [[tone icon] (case kind
+                       :error   ["border-error bg-error text-error-content" "✕"]
+                       :info    ["border-info bg-info text-info-content" "i"]
+                       :warning ["border-warning bg-warning text-warning-content" "!"]
+                       ["border-success bg-success text-success-content" "✓"])]
+     [:div {:hx-swap-oob "beforeend:#toasts"}
+      [:div {:class        (str "toast-pop flex items-center gap-2 rounded-lg border px-4 py-3 "
+                                "text-sm font-medium shadow-lg " tone)
+             :role         "status"
+             "hx-on::load" "setTimeout(() => this.remove(), 4000)"}
+       [:span {:aria-hidden "true"} icon]
+       [:span message]]])))
+
 (defn page
   "Renders a complete HTML document. Extra arguments are placed inside <main>.
 
@@ -196,4 +226,7 @@
     (navbar)
     [:main {:id "main" :class "flex-1"}
      content]
-    (footer)]))
+    (footer)
+    ;; Out-of-band confirmations are appended here.
+    [:div {:id    "toasts"
+           :class "pointer-events-none fixed top-4 right-4 z-[60] flex flex-col items-end gap-2"}]]))

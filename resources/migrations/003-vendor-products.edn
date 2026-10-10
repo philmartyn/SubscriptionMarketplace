@@ -1,0 +1,19 @@
+;; Products gain the two columns the vendor listing form collects, plus an
+;; index for the query that backs "my products".
+;;
+;; category is free text for now: the marketing nav promises categories, but no
+;; taxonomy is fixed yet. image_url is a link the vendor pastes in, not an
+;; upload - there is no file storage in this stack.
+[
+ 
+ {:id "011-add-product-category-and-image"
+  :up ["ALTER TABLE products
+  ADD COLUMN category  TEXT,
+  ADD COLUMN image_url TEXT;"]
+  :down ["ALTER TABLE products DROP COLUMN category, DROP COLUMN image_url;"]}
+
+ {:id "012-index-products-by-vendor"
+  :up ["CREATE INDEX products_vendor_idx ON products (vendor_id);"]
+  :down ["DROP INDEX products_vendor_idx;"]}
+
+ ]
