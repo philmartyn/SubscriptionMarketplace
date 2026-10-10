@@ -94,13 +94,18 @@
            ;; The agent's default OTLP endpoint is http://localhost:4318, which
            ;; is where the collector publishes; leave the endpoint unset so an
            ;; env var can point it at Grafana Cloud later.
-           ;; The agent also instruments logs and would POST them to /v1/logs,
-           ;; which the collector 404s (no logs pipeline yet - Loki is a later
-           ;; pass). Turn that signal off so the only noise is real.
+           ;;
+           ;; Logs are exported too. The agent auto-instruments Logback, so every
+           ;; tools.logging call becomes a structured OTLP log record (severity,
+           ;; service, environment, trace/span id) that the collector ships to
+           ;; Loki. The console appender is untouched, so stdout stays readable.
+           ;; experimental-log-attributes adds thread.name/thread.id, which the
+           ;; default log records do not carry.
            :otel  {:jvm-opts ["-javaagent:dev/observability/opentelemetry-javaagent.jar"
                               "-Dotel.service.name=submarket"
                               "-Dotel.resource.attributes=deployment.environment=dev"
-                              "-Dotel.logs.exporter=none"]}
+                              "-Dotel.logs.exporter=otlp"
+                              "-Dotel.instrumentation.logback-appender.experimental-log-attributes=true"]}
 
            :check {:replace-deps {dev.weavejester/cljfmt {:mvn/version "0.13.0"}}
                    :main-opts    ["-m" "cljfmt.main" "check"]}

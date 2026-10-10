@@ -20,3 +20,35 @@ datasources:
       # Let a span's service/trace jump to the matching metric series.
       tracesToMetrics:
         datasourceUid: prometheus
+
+      # ...and to the logs for that trace. The collector stores trace ids as
+      # Loki structured metadata and Loki streams are labelled with
+      # service_name, so map the span's service.name attribute onto that label
+      # to keep the query selective; filtering by trace id narrows the rest.
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: "-1h"
+        spanEndTimeShift: "1h"
+        filterByTraceID: true
+        filterBySpanID: false
+        tags:
+          - key: service.name
+            value: service_name
+
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    jsonData:
+      # The reverse link, a log line to its trace. Native OTLP ingestion puts
+      # trace_id in structured metadata rather than in the body, so match the
+      # metadata field by name (`matcherType: label`) instead of a regex over
+      # the line.
+      derivedFields:
+        - name: TraceID
+          matcherType: label
+          matcherRegex: trace_id
+          datasourceUid: tempo
+          url: '$${__value.raw}'
+          urlDisplayLabel: View trace

@@ -1,30 +1,34 @@
-# Local observability (metrics + traces)
+# Local observability (metrics, traces + logs)
 
-Optional development stack for looking at SubMarket's metrics and traces in
-Grafana. It is deliberately small:
+Optional development stack for looking at SubMarket's metrics, traces and logs
+in Grafana. It is deliberately small:
 
 ```
 Clojure app (host, :otel alias)
   └─ OTel Java agent  --OTLP :4318-->  otel-collector (container)
                                           ├─ traces  --> tempo:4317
-                                          └─ metrics --> prometheus exporter :8889
-                                                                   ▲ scrape
+                                          ├─ metrics --> prometheus exporter :8889
+                                          │                          ▲ scrape
+                                          └─ logs    --> loki:3100
 Prometheus (container) <───────────────────────────────────────────┘
-Grafana (container) ── queries ──> Prometheus (metrics), Tempo (traces)
+Grafana (container) ── queries ──> Prometheus (metrics), Tempo (traces), Loki (logs)
 ```
 
 Nothing here runs by default. A plain `docker compose up` still starts only
-Postgres, and the app is unchanged unless you add the `:otel` alias. Structured
-logs (Loki) are a later pass.
+Postgres, and the app is unchanged unless you add the `:otel` alias. With it the
+agent also exports logs, so every `tools.logging` call lands in Loki as a
+structured record (severity, service, environment, trace/span id). The console
+appender is untouched: stdout stays human-readable.
 
 ## Layout
 
 | Path | What it is |
 |---|---|
 | `fetch-agent.sh` | Downloads the pinned OTel Java agent here (gitignored) |
-| `otel-collector.yaml` | Collector: OTLP in; Tempo (traces) and a Prometheus scrape endpoint (metrics) out |
+| `otel-collector.yaml` | Collector: OTLP in; Tempo (traces), a Prometheus scrape endpoint (metrics) and Loki (logs) out |
 | `prometheus.yaml` | Scrapes the collector, and itself for health |
 | `tempo.yaml` | Single-binary Tempo, local storage |
+| `loki.yaml` | Single-binary Loki, local storage, structured metadata enabled |
 | `grafana/provisioning/` | Datasources and the dashboard provider, loaded at startup |
 | `grafana/dashboards/` | The starter "SubMarket overview" dashboard |
 
@@ -34,7 +38,7 @@ logs (Loki) are a later pass.
 # 1. Agent jar, once (~26 MB, gitignored)
 ./dev/observability/fetch-agent.sh
 
-# 2. The stack: collector, Prometheus, Tempo, Grafana
+# 2. The stack: collector, Prometheus, Tempo, Loki, Grafana
 docker compose --profile observability up -d
 
 # 3. The app, with the agent attached.
@@ -61,6 +65,7 @@ with no collector reachable.
 | Grafana | http://localhost:3001 | admin / admin |
 | Prometheus | http://localhost:9090 | — |
 | Tempo | http://localhost:3200 | — |
+| Loki | http://localhost:3100 | — |
 | Collector metrics (debug) | http://localhost:8889/metrics | — |
 
 Grafana is on **3001** because the app already uses 3000.
@@ -75,6 +80,12 @@ Grafana is on **3001** because the app already uses 3000.
 - **Explore → Prometheus** — raw metric names, for example
   `http_server_request_duration_seconds_count`, `jvm_memory_used_bytes`,
   `auth_signup_total`.
+- **Explore → Loki** — logs for `{service_name="submarket"}`. Stream labels are
+  the resource attributes (`service_name`, `deployment_environment`); the rest of
+  the record (severity, logger, thread, `trace_id`, `span_id`) is stored as
+  structured metadata, queryable without a JSON parser. A log line's **View
+  trace** link opens its Tempo trace, and a span's **Logs for this span** link
+  comes back the other way.
 
 Metric names are translated on the way out of the collector (dots become
 underscores, counters gain `_total`, histograms gain `_bucket`/`_sum`/`_count`),
@@ -84,7 +95,7 @@ relying on a name.
 ## Turn it off
 
 ```bash
-docker compose --profile observability down       # keep metrics and traces
+docker compose --profile observability down       # keep metrics, traces and logs
 docker compose --profile observability down -v    # also drop the volumes
 ```
 

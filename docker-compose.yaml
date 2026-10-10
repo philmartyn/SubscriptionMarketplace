@@ -70,12 +70,26 @@ services:
       - app_network
     restart: unless-stopped
 
+  loki:
+    image: grafana/loki:3.6.17
+    profiles: ["observability"]
+    command: ["-config.file=/etc/loki.yaml"]
+    volumes:
+      - ./dev/observability/loki.yaml:/etc/loki.yaml:ro
+      - loki-data:/loki
+    ports:
+      - "3100:3100" # Loki HTTP / OTLP ingestion
+    networks:
+      - app_network
+    restart: unless-stopped
+
   grafana:
     image: grafana/grafana:13.0.10
     profiles: ["observability"]
     depends_on:
       - prometheus
       - tempo
+      - loki
     environment:
       # Local, disposable credentials. Grafana binds to 3001 on the host
       # because the app already owns 3000.
@@ -100,4 +114,5 @@ volumes:
   pgdata:
   prometheus-data:
   tempo-data:
+  loki-data:
   grafana-data:

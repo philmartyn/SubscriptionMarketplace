@@ -1,9 +1,8 @@
 # OpenTelemetry Collector for local development.
 #
 # The app's Java agent speaks OTLP only; the collector is the hub that turns
-# that into the two things Grafana reads here: traces into Tempo, and metrics
-# into a Prometheus scrape endpoint. Adding Loki later means one more exporter
-# and a logs pipeline, nothing else.
+# that into the three things Grafana reads here: traces into Tempo, metrics into
+# a Prometheus scrape endpoint, and logs into Loki's native OTLP endpoint.
 
 receivers:
   otlp:
@@ -34,6 +33,16 @@ exporters:
     resource_to_telemetry_conversion:
       enabled: true
 
+  # Logs go to Loki's native OTLP endpoint. The otlphttp exporter appends
+  # /v1/logs, so the endpoint is Loki's OTLP base, not the full path. Loki maps
+  # resource attributes (service.name, deployment.environment) to index labels
+  # and everything else to structured metadata; no encoding or hints needed.
+  # The older `loki` exporter is deprecated in favour of this path.
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+    tls:
+      insecure: true
+
 service:
   pipelines:
     traces:
@@ -44,3 +53,7 @@ service:
       receivers: [otlp]
       processors: [batch]
       exporters: [prometheus]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/loki]
