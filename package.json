@@ -13,5 +13,8 @@
   },
   "dependencies": {
     "daisyui": "^5.0.43"
+  },
+  "overrides": {
+    "@parcel/watcher": "2.6.0"
   }
 }

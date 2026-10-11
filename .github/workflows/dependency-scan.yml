@@ -25,13 +25,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      # 2. Install Java and the Clojure CLI
+      # 2. Install the JDK. setup-clojure only installs the Clojure CLI; it
+      #    expects Java to already be present. Pin the runtime here instead of
+      #    inheriting whatever the runner image happens to default to.
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '24'
+
+      # 3. Install the Clojure CLI
       - name: Setup Clojure
         uses: DeLaGuardo/setup-clojure@master
         with:
           cli: 'latest'
 
-      # 3. Cache dependencies to speed up future workflow runs. The
+      # 4. Cache dependencies to speed up future workflow runs. The
       # :clj-watson alias is a git dep, so its checkout lands in ~/.gitlibs.
       - name: Cache Clojure dependencies
         uses: actions/cache@v6
@@ -44,7 +53,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-clojure-
 
-      # 4. Scan deps.edn. github-advisory uses the default GITHUB_TOKEN, so no
+      # 5. Scan deps.edn. github-advisory uses the default GITHUB_TOKEN, so no
       # secret is needed and there is no NVD database to download. Fail when any
       # finding has a CVSS base score >= 7 (high/critical).
       - name: Vulnerable dependency check

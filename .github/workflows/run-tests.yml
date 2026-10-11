@@ -42,13 +42,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      # 2. Install Java and the Clojure CLI
+      # 2. Install the JDK. setup-clojure only installs the Clojure CLI; it
+      #    expects Java to already be present. Pin the runtime here instead of
+      #    inheriting whatever the runner image happens to default to.
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '24'
+
+      # 3. Install the Clojure CLI
       - name: Setup Clojure
         uses: DeLaGuardo/setup-clojure@master
         with:
           cli: 'latest' # Installs the latest Clojure CLI
 
-      # 3. Node, for the Tailwind build below
+      # 4. Node, for the Tailwind build below
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
@@ -56,7 +65,7 @@ jobs:
           cache: 'npm'
           cache-dependency-path: package-lock.json
 
-      # 4. Build the stylesheet.
+      # 5. Build the stylesheet.
       #
       # resources/public/output.css is generated and gitignored, so a fresh
       # checkout does not have it. core-test asserts that it is served, which
@@ -70,7 +79,7 @@ jobs:
           npm ci
           npm run tailwind
 
-      # 5. Cache dependencies to speed up future workflow runs
+      # 6. Cache dependencies to speed up future workflow runs
       - name: Cache Clojure dependencies
         uses: actions/cache@v6
         with:
@@ -82,7 +91,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-clojure-
 
-      # 6. Run the test command
+      # 7. Run the test command
       #
       # The schema is applied by the :migrate? flag in system.edn, which is
       # enabled for the :test profile, so no separate migrate step is needed.
@@ -91,7 +100,7 @@ jobs:
       - name: Run test suite
         run: clojure -X:test
 
-      # 7. Surface the results as a check run with per-test detail and file
+      # 8. Surface the results as a check run with per-test detail and file
       # annotations. Runs on failure too, so a red build still reports why.
       - name: Publish test report
         if: success() || failure()
