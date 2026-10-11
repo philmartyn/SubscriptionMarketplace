@@ -159,6 +159,83 @@ The payments approach was deliberately re-evaluated. The current choice is **Str
 
 ---
 
+## Future: in-store cash-to-subscription (deferred-start)
+
+Status: future / considered — not Phase 1. A vendor upsell to revisit once the core marketplace is live.
+
+Idea: a vendor converts a **walk-in, cash single purchase** into a recurring subscription. The customer pays cash in store; the vendor enrols them into a subscription whose billing begins on the **next cycle**, processed normally by Stripe.
+
+### Approach
+- The initial cash sale is a **vendor-owned retail transaction the platform never touches** — not listed, ordered, or paid for through SubMarket. The platform forgoes commission and tax liability on it by design.
+- The subscription is a **separate, platform-mediated relationship** that begins with its **first Stripe-billed cycle**. The platform is MoR (and Stripe Tax applies) only from that first charge.
+- Implementation is small and additive:
+  - **Deferred-start subscription** (Stripe `start_date` / `billing_cycle_anchor` / trial): billing starts at the next cycle.
+  - **Vendor in-store enrolment flow**: capture customer (email/phone) + card, hand off to Stripe hosted setup; account claimed like guest checkout.
+  - **No offline-payment ledger row**, **no platform-side scheduler**, and **no forked tax model** — every billed cycle is a normal Stripe charge.
+
+### Boundary condition (must hold)
+The platform must **not facilitate** the initial cash sale: no platform listing, checkout, recorded payment, or use of the platform's in-store tool as the POS for that sale. If it *were* a platform order paid in cash, marketplace-facilitator / deemed-supplier rules and the commission model would attach.
+
+### Caveats
+- **Deterministic billing start** — fixed by rule (at enrolment or next cycle), not vendor-extendable, to avoid gaming.
+- **Don't book the interim period as a platform sale** — goods supplied before the first charge belong to the vendor's own sale.
+- **The vendor remains the retailer** for the store sale and its tax.
+- **Confirm with tax counsel** — facilitator / deemed-supplier rules are jurisdiction-specific.
+- **Keep the platform POS out of the initial sale** — otherwise facilitation is reintroduced.
+
+### Why it's attractive
+The walk-in sale is the warmest possible lead. The vendor does the selling, the platform captures the recurring revenue, and the pitch is clean: *"we don't take a cut of your walk-in sale; we just take over the recurring revenue."*
+
+### Dropped alternative
+A per-cycle or prepaid cash model — recording offline cash payments against platform-tracked subscriptions — was considered and set aside: it reintroduces commission-on-cash mechanics, platform-side tax collection and remittance for sales Stripe never processed, a platform-side renewal scheduler, and cash-payment integrity controls.
+
+### Relationship to current decisions
+Extends decision 11 ("Collection of online orders only") and would slot in as a **Phase 2–3** vendor capability.
+
+---
+
+## In-store collection / redemption recording
+
+Status: design spec — manual capture ships with fulfillment; the quota model is planned.
+
+Context: a `collection` or `service` product's fulfilment is handed over in person, so we need to record that the handover happened. The customer **presents** an identifier; the **vendor** records the handover. The customer never self-marks (except possibly ultra-low-value items, flagged as a maybe).
+
+### Entitlement model
+- Quota-shaped from the start: **N redemptions per period**, where periodic products are simply the **N = 1** case. Modelling it this way now means the later quota feature is a config change, not a schema migration.
+
+### Capture
+- **Now:** a vendor-facing **Collect page** with **manual entry + short code**.
+- **Later (same page):** QR/camera capture and handheld-scanner (keyboard-wedge) capture.
+
+### Token strategy (per product / interval / value)
+- High-value, periodic → **one-time per-cycle signed code**.
+- Low-value, high-frequency → **static membership token + quota**.
+- Per-product config with a platform default.
+
+### Missed collections
+- **Carry-over entitlement:** uncollected redemptions stay redeemable in later periods, capped at **N per period**; anything beyond N is forfeited. No money moves.
+- **N is per-product with a platform default.**
+
+### Security
+- Signed codes; short TTL and/or one-time use.
+- **Idempotent** marking; **audit log** (who / when / where / method); rate limiting; ownership scoping so a vendor can only collect their own subscribers.
+
+### Likely data-model shape
+- Plan config: redemption period, allowance per period, carry-over cap (`N`), token strategy.
+- Per-subscription **entitlement ledger**: allowance, used, carried over, forfeited, per period.
+- **Redemptions** log: subscription, timestamp, vendor/location, method (code/manual), operator, idempotency key.
+
+### Deferred / to nail down
+- Quota-per-period products (the "coffee a day" case).
+- Catch-up collections (redeem several at once); early/late redemption; offline queuing.
+- What "period" means for quota vs the billing cycle (they may differ).
+- QR/camera capture and handheld-scanner capture.
+
+### Relationship to decisions
+Extends **decision 2** (fulfillment modes) and refines **decision 3** — "each paid cycle = one fulfilment" holds for N = 1 and becomes "up to N redemptions per cycle" for services.
+
+---
+
 ## Open items (lighter — refine, not blocking)
 
 - Refund / dispute handling UX.
