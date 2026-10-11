@@ -61,7 +61,8 @@
                                  peridot/peridot                      {:mvn/version "0.5.4"}
                                  org.clj-commons/byte-streams         {:mvn/version "0.3.4"}
                                  com.lambdaisland/classpath           {:mvn/version "0.5.48"}
-                                 lambdaisland/kaocha                  {:mvn/version "1.91.1392"}}
+                                 lambdaisland/kaocha                  {:mvn/version "1.91.1392"}
+                                 lambdaisland/kaocha-junit-xml           {:mvn/version "1.17.101"}}
                    :exec-fn     kaocha.runner/exec-fn
                    :extra-paths ["test/clj" "dev"]}
 
@@ -112,6 +113,15 @@
 
            :fix   {:replace-deps {dev.weavejester/cljfmt {:mvn/version "0.13.0"}}
                    :main-opts    ["-m" "cljfmt.main" "fix"]}
+
+           ;; Scan deps.edn for known vulnerabilities. Uses :replace-deps so the
+           ;; scanner and its dependency tree never touch the project classpath.
+           ;; git-sha is pinned to the v6.1.0 tag; bump both together.
+           :clj-watson
+           {:replace-deps {io.github.clj-holmes/clj-watson
+                           {:git/tag "v6.1.0"
+                            :git/sha "be98e4db74fb8927db4825cc73bbe2606e44e5e3"}}
+            :main-opts    ["-m" "clj-watson.cli"]}
 
            }
  }

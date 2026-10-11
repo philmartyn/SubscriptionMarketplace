@@ -1,0 +1,79 @@
+name: Dependency scan
+
+# Scans deps.edn (clj-watson against the GitHub Advisory Database) and
+# package-lock.json (npm audit) for known vulnerabilities in the dependency
+# tree. Runs on every push/PR against main, plus a weekly scheduled scan for
+# new advisories that appear without code changes.
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    # Monday 06:00 UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  clojure:
+    name: Clojure dependencies
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      # 1. Check out the repository code
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # 2. Install Java and the Clojure CLI
+      - name: Setup Clojure
+        uses: DeLaGuardo/setup-clojure@master
+        with:
+          cli: 'latest'
+
+      # 3. Cache dependencies to speed up future workflow runs. The
+      # :clj-watson alias is a git dep, so its checkout lands in ~/.gitlibs.
+      - name: Cache Clojure dependencies
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.gitlibs
+            .cpcache
+          key: ${{ runner.os }}-clojure-${{ hashFiles('**/deps.edn') }}
+          restore-keys: |
+            ${{ runner.os }}-clojure-
+
+      # 4. Scan deps.edn. github-advisory uses the default GITHUB_TOKEN, so no
+      # secret is needed and there is no NVD database to download. Fail when any
+      # finding has a CVSS base score >= 7 (high/critical).
+      - name: Vulnerable dependency check
+        run: clojure -M:clj-watson scan -p deps.edn --database-strategy github-advisory --output stdout-simple --cvss-fail-threshold 7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  npm:
+    name: npm dependencies
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      # 1. Check out the repository code
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # 2. Set up Node and the npm cache from package-lock.json
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      # 3. Install exactly the committed dependency set, then audit it.
+      # npm audit exits non-zero for high and critical findings.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Vulnerable dependency check
+        run: npm audit --audit-level=high

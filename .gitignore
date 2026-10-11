@@ -6,6 +6,9 @@
 /.nrepl-port
 /log/
 
+# Kaocha JUnit XML report (test run output, rebuilt by CI).
+/target/
+
 # Fetched by dev/observability/fetch-agent.sh - not committed, ~26 MB.
 /dev/observability/opentelemetry-javaagent.jar
 

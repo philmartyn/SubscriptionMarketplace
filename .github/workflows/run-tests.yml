@@ -10,6 +10,11 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    # The JUnit report action posts a check run, which needs checks: write.
+    permissions:
+      contents: read
+      checks: write
+
     # Mirrors docker-compose.yaml exactly: same image major, database name,
     # role and port. Tests read these credentials from system.edn, so any
     # divergence here shows up as a connection failure rather than as a
@@ -81,5 +86,15 @@ jobs:
       #
       # The schema is applied by the :migrate? flag in system.edn, which is
       # enabled for the :test profile, so no separate migrate step is needed.
+      # tests.edn enables the kaocha junit-xml plugin, which writes
+      # target/junit.xml (plus source locations) after the suite runs.
       - name: Run test suite
         run: clojure -X:test
+
+      # 7. Surface the results as a check run with per-test detail and file
+      # annotations. Runs on failure too, so a red build still reports why.
+      - name: Publish test report
+        if: success() || failure()
+        uses: mikepenz/action-junit-report@v6
+        with:
+          report_paths: 'target/junit.xml'
