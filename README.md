@@ -40,6 +40,9 @@ under `/api`.
 - **JDK 24** — the project and CI are pinned to 24. Undertow 2.4.x/xnio require
   Java 17+, so anything from 17 up will run, but 24 is what CI uses.
 - **Clojure CLI** (`clojure` / `clj`) — <https://clojure.org/guides/install_clojure>
+- **clj-kondo** — the linter CI runs. A standalone binary, not a `deps.edn`
+  dependency; install it via your package manager or
+  <https://github.com/clj-kondo/clj-kondo#installation>.
 - **Node.js 22** and npm — for the Tailwind build.
 - **Docker** — for the local Postgres instance (and, optionally, the
   observability stack).
@@ -80,6 +83,7 @@ clojure -M:dev
 | Run the dev server | `clojure -M:dev -m app.core dev` |
 | Start a REPL | `clojure -M:dev` |
 | Run the test suite | `clojure -X:test` |
+| Lint the sources | `clj-kondo --lint src test dev` |
 | Check formatting | `clojure -M:check` |
 | Fix formatting | `clojure -M:fix` |
 | Apply / undo / inspect migrations | `clojure -M:db migrate` · `clojure -M:db rollback [n]` · `clojure -M:db status` |
@@ -106,6 +110,10 @@ applied automatically for the `:test` profile.
 View tests assert on hiccup trees rather than rendered HTML strings where
 possible — see `test/clj/views/support.clj` for the helpers (`elements`,
 `find-by-class`, `within?`, …).
+
+CI additionally gates on linting and formatting (see
+[Continuous integration](#continuous-integration)): `clj-kondo --lint src test dev`
+and `clojure -M:check`. Run both before pushing.
 
 ## Database and migrations
 
@@ -145,7 +153,7 @@ dev/              Development-only code (never on the production classpath)
 test/clj/         Kaocha tests mirroring the src layout
 resources/        system.edn, logback.xml, migrations/, public/
 tailwind/         Tailwind entrypoint (input.css)
-.github/workflows/  CI: test suite + dependency scan
+.github/workflows/  CI: test suite + dependency scan + lint
 ```
 
 A feature module typically contains `db.clj` (queries), `handlers.clj` (HTTP
@@ -171,7 +179,7 @@ the full walkthrough.
 
 ## Continuous integration
 
-Two GitHub Actions workflows run on push/PR to `main`/`master`:
+Three GitHub Actions workflows run on push/PR to `main`/`master`:
 
 - **`run-tests.yml`** — builds the stylesheet, runs `clojure -X:test` against a
   Postgres service container, and publishes `target/junit.xml` as a check run
@@ -180,9 +188,12 @@ Two GitHub Actions workflows run on push/PR to `main`/`master`:
   [clj-watson](https://github.com/clj-holmes/clj-watson) (GitHub Advisory
   Database) and `package-lock.json` with `npm audit`. It also runs on a weekly
   schedule to catch newly published advisories.
+- **`lint.yml`** — runs `clj-kondo --lint src test dev` (any warning fails the
+  build; the linter version is pinned to match local runs) and checks formatting
+  with the same `clojure -M:check` alias used locally.
 
-Both pin **Temurin JDK 24**. There is intentionally no Dependabot config; the
-scheduled scan is the mechanism for surfacing dependency advisories.
+All three pin **Temurin JDK 24**. There is intentionally no Dependabot config;
+the scheduled scan is the mechanism for surfacing dependency advisories.
 
 ### Dependency scanning
 
