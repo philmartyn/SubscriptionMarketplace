@@ -70,7 +70,7 @@
               "output.css should be served once the Tailwind bundle is built")
           (println " [skip] output.css not built - run `npm install && npm run tailwind`")))
       (sut/stop-app)
-      (is "Connection refused" (try (client/get base-path) (catch ConnectException ce (.getMessage ce)))))))
+      (is (thrown? ConnectException (client/get base-path))))))
 
 (deftest live-signup-and-verification-flow-test
   (let [server-config (get-in (config/system-config {:profile :test}) [:server/http])

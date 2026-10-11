@@ -1,4 +1,4 @@
 (ns modules.users.db)
 
-(defn fetch-user [id] ;; SQL here
+(defn fetch-user [_id] ;; SQL here
   )

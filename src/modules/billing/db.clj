@@ -1,4 +1,4 @@
 (ns modules.billing.db)
 
-(defn insert-billing [data] ;; insert logic
+(defn insert-billing [_data] ;; insert logic
   )

@@ -1,5 +1,5 @@
 (ns modules.subscriptions.handlers)
 
-(defn create-subscription [data]
+(defn create-subscription [_data]
   ;create logic
   )

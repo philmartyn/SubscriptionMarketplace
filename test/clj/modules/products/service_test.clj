@@ -8,7 +8,6 @@
    [clojure.test :refer [deftest is testing use-fixtures]]
    [modules.auth.db :as auth.db]
    [modules.auth.support :as sup]
-   [modules.products.db :as products.db]
    [modules.products.service :as service]
    [modules.vendors.db :as vendors.db]))
 

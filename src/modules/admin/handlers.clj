@@ -1,4 +1,4 @@
 (ns modules.admin.handlers)
 
-(defn create-admin [data] ;; create logic
+(defn create-admin [_data] ;; create logic
   )

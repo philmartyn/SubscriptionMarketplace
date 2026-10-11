@@ -1,4 +1,4 @@
 (ns modules.marketplace.db)
 
-(defn insert-marketplace [data] ;; insert logic
+(defn insert-marketplace [_data] ;; insert logic
   )

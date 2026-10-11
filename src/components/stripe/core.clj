@@ -1,4 +1,4 @@
 (ns components.stripe.core)
 
-(defn handle-webhook [req] ;; Stripe webhook logic
+(defn handle-webhook [_req] ;; Stripe webhook logic
   )

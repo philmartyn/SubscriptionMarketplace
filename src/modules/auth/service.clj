@@ -113,10 +113,8 @@
   Returns {:ok? true :account-id n :account-type k :verification-url u} or
   {:ok? false :errors {...}} with errors keyed by form field. Never throws for
   input a caller could have got wrong."
-  [db mailer config {:keys [account-type email password name description] :as input}]
-  ;; clojure.core/name is qualified because `name` is destructured from input
-  ;; below, and the local string would otherwise be called as a function.
-  (telemetry/with-span "auth.register" {:account_type (some-> account-type clojure.core/name)}
+  [db mailer config {:keys [account-type email password] :as input}]
+  (telemetry/with-span "auth.register" {:account_type (some-> account-type name)}
     (let [errors (validation-errors account-type input)]
       (if (seq errors)
         (do
@@ -127,7 +125,7 @@
             (do
               (telemetry/incr! "auth.signup.rejected" {:reason "duplicate-email"})
               {:ok? false :errors {:email "An account already exists for that email."}})
-            (let [{:keys [id] :as account}
+            (let [{:keys [id]}
                   (db/register! db (assoc input
                                           :email             (str/trim (str email))
                                           :email-normalized  normalized
@@ -141,7 +139,7 @@
                 :body    (str "Welcome to SubMarket. Confirm your email address to "
                               "activate your account:\n\n" url "\n\n"
                               "The link is valid for " verification-ttl-hours " hours.")})
-              (telemetry/incr! "auth.signup" {:account_type (some-> account-type clojure.core/name)})
+              (telemetry/incr! "auth.signup" {:account_type (some-> account-type name)})
               {:ok? true
                :account-id id
                ;; The keyword that came in, not (:account_type account): accounts

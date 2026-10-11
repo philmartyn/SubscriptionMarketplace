@@ -1,4 +1,4 @@
 (ns modules.billing.handlers)
 
-(defn create-billing [data] ;; create logic
+(defn create-billing [_data] ;; create logic
   )

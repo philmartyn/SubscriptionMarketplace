@@ -1,0 +1,67 @@
+name: Lint
+
+# Runs clj-kondo over the sources and checks formatting with cljfmt. Kept
+# separate from the test job so a style problem fails fast, with its own status,
+# instead of waiting for the database-backed suite to boot.
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: clj-kondo + cljfmt
+    runs-on: ubuntu-latest
+
+    # Read-only: this job reports findings to the console rather than posting a
+    # check run, so it needs no write scopes and works on pull requests from
+    # forks.
+    permissions:
+      contents: read
+
+    steps:
+      # 1. Check out the repository code
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # 2. Install the JDK. setup-clojure only installs the Clojure CLI; it
+      #    expects Java to already be present. cljfmt runs through the CLI, so a
+      #    JVM is required even though clj-kondo itself is a native binary.
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '24'
+
+      # 3. Install the Clojure CLI and a pinned clj-kondo. The linter version is
+      #    pinned so CI and local runs report exactly the same findings.
+      - name: Setup Clojure
+        uses: DeLaGuardo/setup-clojure@master
+        with:
+          cli: 'latest'
+          clj-kondo: '2026.08.04'
+
+      # 4. Cache dependencies so the :check alias does not re-download cljfmt.
+      #    Shares the key with the test workflow, so the two warm each other.
+      - name: Cache Clojure dependencies
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.gitlibs
+            .cpcache
+          key: ${{ runner.os }}-clojure-${{ hashFiles('**/deps.edn') }}
+          restore-keys: |
+            ${{ runner.os }}-clojure-
+
+      # 5. Lint. clj-kondo exits non-zero on warnings as well as errors, so a
+      #    single unused binding fails the job.
+      - name: Lint (clj-kondo)
+        run: clj-kondo --lint src test dev
+
+      # 6. Format check. The :check alias pins cljfmt in deps.edn, so this is
+      #    exactly the command run locally.
+      - name: Format check (cljfmt)
+        run: clojure -M:check

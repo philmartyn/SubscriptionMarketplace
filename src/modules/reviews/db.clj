@@ -1,4 +1,4 @@
 (ns modules.reviews.db)
 
-(defn insert-review [data] ;; insert logic
+(defn insert-review [_data] ;; insert logic
   )

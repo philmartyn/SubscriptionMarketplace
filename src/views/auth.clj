@@ -38,7 +38,7 @@
                    :fields      [["name" "Name" "text" "name"]
                                  ["email" "Email" "email" "email"]
                                  ["password" "Password" "password" "new-password"]]}
-   :vendor-signup {:heading     (str "Create your vendor account")
+   :vendor-signup {:heading     "Create your vendor account"
                    :subheading  "List a plan and manage your customer deliveries."
                    :title       (str "Vendor signup - " layout/site-name)
                    :description (str "Create a " layout/site-name " vendor account to list your plans.")

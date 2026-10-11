@@ -2,7 +2,10 @@
 /.idea/
 /node_modules/
 /resources/public/output.css
-/.clj-kondo/
+# clj-kondo config is committed; only the generated analysis cache and the
+# library configs copied into imports/ are ignored.
+/.clj-kondo/.cache/
+/.clj-kondo/imports/
 /.nrepl-port
 /log/
 
@@ -14,3 +17,4 @@
 
 # macOS
 .DS_Store
+/install-clj-kondo

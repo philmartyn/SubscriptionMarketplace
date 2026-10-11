@@ -1,0 +1,10 @@
+;; Committed so CI and local runs agree. Only the generated .cache/ and the
+;; downloaded library configs under imports/ are ignored (see .gitignore).
+;;
+;; ring.util.http-response re-exports content-type from ring.util.response via
+;; potemkin.namespaces/import-vars, but wraps it in a runtime
+;; (if-not (ns-resolve ...)) guard that clj-kondo cannot see through. The var
+;; resolves at runtime, so suppress the false positive rather than the call.
+{:linters
+ {:unresolved-var
+  {:exclude [ring.util.http-response/content-type]}}}

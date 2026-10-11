@@ -1,4 +1,4 @@
 (ns modules.vendors.handlers)
 
-(defn create-vendor [data] ;; create logic
+(defn create-vendor [_data] ;; create logic
   )

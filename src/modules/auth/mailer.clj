@@ -25,7 +25,7 @@
 
 (defrecord LoggingMailer [config]
   Mailer
-  (send-email [_ {:keys [to subject] :as message}]
+  (send-email [_ {:keys [to subject]}]
     (log/info "Email not sent: no provider configured"
               :to to
               :subject subject

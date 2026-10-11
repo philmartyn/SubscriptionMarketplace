@@ -1,4 +1,4 @@
 (ns modules.reviews.handlers)
 
-(defn create-reviews [data] ;; create logic
+(defn create-reviews [_data] ;; create logic
   )
